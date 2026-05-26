@@ -64,10 +64,10 @@ Thumbs.db
 postgres_data/
 redis_data/
 
-# Generated / large model files
+# Generated / large ML model files (weights, checkpoints — not SQLAlchemy models)
 *.bin
 *.safetensors
-models/
+/data/models/
 
 # Logs
 *.log
