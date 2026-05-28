@@ -54,7 +54,7 @@ async def main() -> None:
                         "plan_tier": rec.get("plan_tier"),
                         "account_status": rec.get("account_status", "active"),
                         "language_pref": rec.get("language_pref", "en"),
-                        "metadata_": rec.get("metadata"),
+                        "metadata": rec.get("metadata"),
                     },
                 )
             )
