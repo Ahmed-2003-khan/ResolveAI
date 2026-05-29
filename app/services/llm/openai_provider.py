@@ -55,12 +55,28 @@ class OpenAIProvider(LLMProvider):
         rates = _COST_TABLE[model]
         cost = in_tok * rates["input"] + out_tok * rates["output"]
         log.debug("openai_chat_ok", model=model, in_tok=in_tok, out_tok=out_tok, latency_ms=latency_ms)
+        message = response.choices[0].message
+        content = message.content or ""
+        tool_calls: list[dict[str, Any]] = []
+        if message.tool_calls:
+            for tc in message.tool_calls:
+                tool_calls.append(
+                    {
+                        "id": tc.id,
+                        "type": tc.type,
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                )
         return ChatResult(
-            content=response.choices[0].message.content or "",
+            content=content,
             model=model,
             provider=self.name,
             input_tokens=in_tok,
             output_tokens=out_tok,
             cost_usd=cost,
             latency_ms=latency_ms,
+            raw={"tool_calls": tool_calls},
         )
