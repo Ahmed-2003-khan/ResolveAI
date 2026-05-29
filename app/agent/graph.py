@@ -132,3 +132,7 @@ def get_graph(checkpointer=None):
     if _default_graph is None:
         _default_graph = build_graph(MemorySaver())
     return _default_graph
+
+
+# Friendly alias used in scripts and notebooks
+create_agent_graph = get_graph

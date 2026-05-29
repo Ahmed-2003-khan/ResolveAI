@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import Computed, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,6 +19,13 @@ class KBChunk(Base):
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     content_tsv: Mapped[Any] = mapped_column(TSVECTOR, nullable=True)
+    # Language-agnostic full-text vector for Roman-Urdu BM25. Generated/stored
+    # by Postgres — never inserted by the ORM.
+    content_tsv_simple: Mapped[Any] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('simple', content)", persisted=True),
+        nullable=True,
+    )
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     product_area: Mapped[str | None] = mapped_column(String(50), nullable=True)

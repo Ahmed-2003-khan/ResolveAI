@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from pathlib import Path
 
@@ -30,6 +31,37 @@ logger = structlog.get_logger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent / "data" / "seed"
 BATCH_SIZE = 50  # DB insert batch
+
+# Matches the synthetic "[ref #123]" markers that make otherwise-identical
+# tickets look unique.
+_REF_RE = re.compile(r"\[ref\s*#?\d+\]", re.IGNORECASE)
+_NONWORD_RE = re.compile(r"[^a-z\s]+")
+
+
+def _dedup_key(content: str) -> str:
+    """Normalize a chunk so near-identical tickets collapse to one key.
+
+    Strips [ref #N] markers, digits, and punctuation, then lowercases and
+    collapses whitespace. This catches the bulk-generated tickets that differ
+    only by a reference number or ID — they pollute the vector space and bias
+    retrieval toward whichever boilerplate was generated most often.
+    """
+    text_ = _REF_RE.sub("", content.lower())
+    text_ = _NONWORD_RE.sub(" ", text_)
+    return " ".join(text_.split())
+
+
+def _dedup_rows(rows: list[dict]) -> list[dict]:
+    """Keep the first row for each normalized content key."""
+    seen: set[str] = set()
+    kept: list[dict] = []
+    for row in rows:
+        key = _dedup_key(row["content"])
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        kept.append(row)
+    return kept
 
 
 def _load_jsonl(path: Path) -> list[dict]:
@@ -102,7 +134,14 @@ async def main() -> None:
 
     logger.info("loaded_source_records", articles=len(articles), tickets=len(tickets))
 
-    all_rows = _build_rows(articles) + _build_rows(tickets)
+    raw_rows = _build_rows(articles) + _build_rows(tickets)
+    all_rows = _dedup_rows(raw_rows)
+    logger.info(
+        "deduped_chunks",
+        before=len(raw_rows),
+        after=len(all_rows),
+        removed=len(raw_rows) - len(all_rows),
+    )
     logger.info("total_chunks_to_embed", count=len(all_rows))
 
     embedder = get_embedder()

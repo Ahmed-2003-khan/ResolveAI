@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 
 import structlog
@@ -17,6 +18,29 @@ _DENSE_CANDIDATES = 30
 _BM25_CANDIDATES = 30
 _RRF_K = 60
 _PRE_RERANK = 20
+
+# Coarse cosine-distance cutoff for dense candidates. text-embedding-3-small
+# puts clearly off-topic chunks above ~0.72; we keep everything below this and
+# let the cross-encoder reranker do the fine-grained ordering. Tuned to be
+# lenient on purpose — the reranker, not this cutoff, separates near-ties.
+_MAX_COSINE_DISTANCE = 0.72
+
+_TOKEN_RE = re.compile(r"\w+", re.UNICODE)
+
+
+def _build_or_tsquery(query: str) -> str:
+    """Turn a free-text query into an OR-joined to_tsquery string.
+
+    plainto_tsquery ANDs every term, so a mixed Roman-Urdu/English query like
+    "mera order ORD-001 kahan hai" matches nothing in an English corpus. We
+    OR the lexemes instead so any single overlapping term (e.g. "order") can
+    match, then rely on ts_rank + the reranker for ordering.
+    """
+    tokens = [t.lower() for t in _TOKEN_RE.findall(query) if len(t) > 1]
+    # Dedupe while preserving order.
+    seen: set[str] = set()
+    unique = [t for t in tokens if not (t in seen or seen.add(t))]
+    return " | ".join(unique)
 
 
 def _reciprocal_rank_fusion(
@@ -79,40 +103,57 @@ class Retriever:
         product_area = (filters or {}).get("product_area")
         vec_str = "[" + ",".join(str(v) for v in q_vec) + "]"
 
+        # asyncpg cannot infer the type of a bare NULL parameter in a comparison.
+        # Build WHERE fragments dynamically to avoid the ambiguous-parameter error.
+        area_filter = "AND product_area = :product_area" if product_area else ""
+
+        # Dense: drop clearly off-topic chunks via a coarse distance cutoff.
         dense_sql = text(
-            """
+            f"""
             SELECT id, source_id, source_type, title, content, product_area
             FROM kb_chunks
-            WHERE (:product_area IS NULL OR product_area = :product_area)
+            WHERE (embedding <=> CAST(:vec AS vector)) < :max_dist {area_filter}
             ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT :limit
             """
         )
+
+        # BM25: OR the lexemes against the language-agnostic `simple` tsvector
+        # so Roman-Urdu terms survive (no English stemming / stopword removal).
+        or_query = _build_or_tsquery(query)
         bm25_sql = text(
-            """
+            f"""
             SELECT id, source_id, source_type, title, content, product_area
             FROM kb_chunks
-            WHERE content_tsv @@ plainto_tsquery('english', :query)
-              AND (:product_area IS NULL OR product_area = :product_area)
-            ORDER BY ts_rank(content_tsv, plainto_tsquery('english', :query)) DESC
+            WHERE content_tsv_simple @@ to_tsquery('simple', :tsq)
+              {area_filter}
+            ORDER BY ts_rank(content_tsv_simple, to_tsquery('simple', :tsq)) DESC
             LIMIT :limit
             """
         )
 
+        dense_params: dict = {
+            "vec": vec_str,
+            "limit": _DENSE_CANDIDATES,
+            "max_dist": _MAX_COSINE_DISTANCE,
+        }
+        bm25_params: dict = {"tsq": or_query, "limit": _BM25_CANDIDATES}
+        if product_area:
+            dense_params["product_area"] = product_area
+            bm25_params["product_area"] = product_area
+
         async with async_session_factory() as session:
             dense_rows = (
-                await session.execute(
-                    dense_sql,
-                    {"vec": vec_str, "product_area": product_area, "limit": _DENSE_CANDIDATES},
-                )
+                await session.execute(dense_sql, dense_params)
             ).mappings().all()
 
-            bm25_rows = (
-                await session.execute(
-                    bm25_sql,
-                    {"query": query, "product_area": product_area, "limit": _BM25_CANDIDATES},
-                )
-            ).mappings().all()
+            # An empty token set produces an invalid tsquery — skip BM25 then.
+            if or_query:
+                bm25_rows = (
+                    await session.execute(bm25_sql, bm25_params)
+                ).mappings().all()
+            else:
+                bm25_rows = []
 
         def _row_to_dict(row) -> dict:
             return {
