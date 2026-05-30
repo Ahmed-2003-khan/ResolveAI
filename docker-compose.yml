@@ -74,6 +74,28 @@ services:
       - .:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # ── ARQ Worker ────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: resolveai_worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-resolveai}:${POSTGRES_PASSWORD:-resolveai}@db:5432/${POSTGRES_DB:-resolveai}
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    command: python -m arq app.workers.arq_settings.WorkerSettings
+
   # ── Ollama (local LLM — commented out by default, CPU-heavy) ──────────────
   # ollama:
   #   image: ollama/ollama:latest

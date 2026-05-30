@@ -27,7 +27,13 @@ async def whatsapp_inbound(request: Request) -> Response:
     """Receive Twilio WhatsApp webhook, verify signature, enqueue processing."""
     body = await request.body()
     headers = dict(request.headers)
-    headers["_url"] = str(request.url)
+    # Reconstruct the public-facing URL (ngrok / any reverse proxy sets these)
+    forwarded_proto = headers.get("x-forwarded-proto", "").split(",")[0].strip()
+    forwarded_host = headers.get("x-forwarded-host", "") or headers.get("host", "")
+    if forwarded_proto and forwarded_host:
+        headers["_url"] = f"{forwarded_proto}://{forwarded_host}{request.url.path}"
+    else:
+        headers["_url"] = str(request.url)
 
     adapter = get_channel_adapter("whatsapp")
     if not adapter.verify_webhook(headers, body):
@@ -115,7 +121,11 @@ async def websocket_chat(websocket: WebSocket, session_id: str) -> None:
 
 
 async def _enqueue(msg: InboundMessage) -> None:
-    """Push message to the ARQ queue for background processing."""
+    """Push message to the ARQ queue for background processing.
+
+    Falls back to inline processing + channel send if Redis is unavailable,
+    so no message is silently dropped even when the worker isn't running.
+    """
     try:
         from arq import create_pool
         from arq.connections import RedisSettings
@@ -127,9 +137,13 @@ async def _enqueue(msg: InboundMessage) -> None:
         await pool.enqueue_job("process_inbound_message", msg.model_dump(mode="json"))
         await pool.aclose()
     except Exception as exc:
-        log.error("enqueue_failed", error=str(exc))
-        # Fall back to inline processing so no message is silently dropped
-        await _run_agent(msg)
+        log.error("enqueue_failed_falling_back_to_inline", error=str(exc))
+        result = await _run_agent(msg)
+        final_response = result.get("final_response") or ""
+        if final_response:
+            adapter = get_channel_adapter(msg.channel)
+            out = OutboundMessage(channel=msg.channel, to=msg.user_identifier, content=final_response)
+            await adapter.send(out)
 
 
 async def _run_agent(msg: InboundMessage) -> dict:
