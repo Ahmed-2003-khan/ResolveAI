@@ -5,9 +5,11 @@ from __future__ import annotations
 import structlog
 from arq.connections import RedisSettings
 
+from arq.cron import cron
+
 from app.config import get_settings
 from app.core.logging import setup_logging
-from app.workers.tasks import process_inbound_message
+from app.workers.tasks import auto_resolve_inactive_conversations, process_inbound_message
 
 log = structlog.get_logger(__name__)
 
@@ -41,6 +43,10 @@ async def shutdown(ctx: dict) -> None:
 
 class WorkerSettings:
     functions = [process_inbound_message]
+    cron_jobs = [
+        # Resolve conversations with no activity for 30+ minutes — runs every 5 min
+        cron(auto_resolve_inactive_conversations, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}),
+    ]
     redis_settings = RedisSettings.from_dsn(_settings.redis_url)
     on_startup = startup
     on_shutdown = shutdown

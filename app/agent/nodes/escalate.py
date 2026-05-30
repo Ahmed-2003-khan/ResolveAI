@@ -1,4 +1,4 @@
-"""Node: escalate — marks the conversation as needing a human agent."""
+"""Node: escalate — handles human escalations, abuse blocks, and session goodbyes."""
 
 from __future__ import annotations
 
@@ -16,12 +16,37 @@ _APOLOGY = (
     "reach out to you shortly. Thank you for your patience."
 )
 
+_FAREWELL = (
+    "Shukriya hamse contact karne ke liye! Umeed hai aapka masla hal ho gaya. "
+    "Agar dobara koi madad chahiye toh hum hamesha yahan hain. Allah Hafiz! 🙏"
+)
+
 
 async def escalate(state: AgentState) -> dict:
     t0 = time.monotonic()
     intent = state.get("intent") or "unknown"
-    reason = "abuse" if intent == "abuse" else (
-        "explicit_request" if intent == "escalate_human" else "low_critique_score"
+
+    if intent == "session_end":
+        latency = int((time.monotonic() - t0) * 1000)
+        log.info("node_escalate_session_end", conversation_id=state.get("conversation_id"))
+        return {
+            "should_escalate": False,
+            "final_response": _FAREWELL,
+            "total_latency_ms": state.get("total_latency_ms", 0) + latency,
+            "audit_trail": [
+                {
+                    "node": "escalate",
+                    "reason": "session_end",
+                    "latency_ms": latency,
+                    "output": _FAREWELL,
+                }
+            ],
+        }
+
+    reason = (
+        "abuse" if intent == "abuse"
+        else "explicit_request" if intent == "escalate_human"
+        else "low_critique_score"
     )
 
     latency = int((time.monotonic() - t0) * 1000)

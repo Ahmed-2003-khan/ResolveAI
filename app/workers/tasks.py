@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.agent.graph import run_with_cache
 from app.core.db import async_session_factory
@@ -244,6 +244,12 @@ async def _persist_outbound(conversation_id: str, content: str, result: dict) ->
         conv = res.scalar_one_or_none()
         if conv:
             conv.last_activity = datetime.now(timezone.utc)
+            # Explicit goodbye → immediately resolve; human escalation → escalated
+            intent = result.get("intent", "")
+            if intent == "session_end":
+                conv.status = "resolved"
+            elif result.get("should_escalate"):
+                conv.status = "escalated"
 
         msg_id: uuid.UUID | None = None
         if content:
@@ -295,3 +301,37 @@ async def _persist_outbound(conversation_id: str, content: str, result: dict) ->
             session.add(audit)
 
         await session.commit()
+
+
+# ── Periodic task ─────────────────────────────────────────────────────────────
+
+
+INACTIVITY_MINUTES = 30
+
+
+async def auto_resolve_inactive_conversations(ctx: dict) -> None:
+    """Mark conversations that have had no activity for INACTIVITY_MINUTES as resolved.
+
+    Runs every 5 minutes via the ARQ cron schedule in arq_settings.py.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=INACTIVITY_MINUTES)
+    async with async_session_factory() as session:
+        stmt = (
+            update(Conversation)
+            .where(
+                Conversation.status == "active",
+                Conversation.last_activity < cutoff,
+            )
+            .values(status="resolved")
+            .returning(Conversation.id)
+        )
+        result = await session.execute(stmt)
+        resolved_ids = result.scalars().all()
+        await session.commit()
+
+    if resolved_ids:
+        log.info(
+            "auto_resolved_inactive_conversations",
+            count=len(resolved_ids),
+            cutoff_minutes=INACTIVITY_MINUTES,
+        )

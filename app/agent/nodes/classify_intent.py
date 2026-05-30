@@ -23,6 +23,7 @@ _VALID_INTENTS = {
     "general_inquiry",
     "escalate_human",
     "abuse",
+    "session_end",
 }
 
 

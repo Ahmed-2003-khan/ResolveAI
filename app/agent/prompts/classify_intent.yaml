@@ -12,6 +12,7 @@ system: |
   - general_inquiry    : general questions, information requests, or policy questions
   - escalate_human     : explicitly asking to speak to a human or agent
   - abuse              : message contains threats, abusive, or inappropriate content
+  - session_end        : saying goodbye, thank you and closing the conversation (e.g. shukriya, bye, theek hai shukriya)
 
   Rules:
   - Respond with ONLY the intent label — no explanation, no punctuation.

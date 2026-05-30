@@ -29,9 +29,9 @@ from app.agent.state import AgentState
 
 
 def _route_after_classify(state: AgentState) -> str:
-    """Immediately escalate on explicit escalation request or abusive content."""
+    """Short-circuit to escalate for human requests, abuse, or session goodbye."""
     intent = state.get("intent") or ""
-    if intent in ("escalate_human", "abuse"):
+    if intent in ("escalate_human", "abuse", "session_end"):
         return "escalate"
     return "redact_pii"
 
