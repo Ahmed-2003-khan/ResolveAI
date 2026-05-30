@@ -33,9 +33,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Langfuse (self-hosted observability) ───────────────────────────────────
+  # ── Langfuse v2 (self-hosted observability — pinned to v2, no ClickHouse needed)
   langfuse:
-    image: langfuse/langfuse:latest
+    image: langfuse/langfuse:2
     container_name: resolveai_langfuse
     restart: unless-stopped
     depends_on:

@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, WebSocket, WebS
 from fastapi.responses import PlainTextResponse
 
 from app.agent.graph import run_with_cache
+from app.observability.metrics import MESSAGES_RECEIVED, MESSAGES_SENT
 from app.schemas.message import InboundMessage, OutboundMessage
 from app.services.channels import get_channel_adapter
 from app.services.channels.web import connection_manager
@@ -106,6 +107,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str) -> None:
             adapter = get_channel_adapter("web")
             msg = await adapter.parse_inbound(payload)
 
+            MESSAGES_RECEIVED.labels(channel="web").inc()
             log.info("ws_message_received", session_id=session_id, length=len(msg.content))
 
             result = await _run_agent(msg)
@@ -116,6 +118,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str) -> None:
             await _persist_outbound(result.get("conversation_id", ""), reply, result)
 
             await connection_manager.send_text(session_id, reply)
+            MESSAGES_SENT.labels(channel="web").inc()
 
     except WebSocketDisconnect:
         connection_manager.disconnect(session_id)
