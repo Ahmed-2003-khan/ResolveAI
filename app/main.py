@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
@@ -31,6 +31,21 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router)
+
+    # Top-level WebSocket path used by widget.js: /ws/chat/{session_id}
+    @app.websocket("/ws/chat/{session_id}")
+    async def ws_chat(websocket: WebSocket, session_id: str) -> None:
+        from app.api.v1.inbound import websocket_chat
+
+        await websocket_chat(websocket, session_id)
+
+    # Serve static assets (widget.js, etc.)
+    try:
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/static", StaticFiles(directory="admin_ui/static"), name="static")
+    except RuntimeError:
+        pass  # directory missing in test environments
 
     return app
 
