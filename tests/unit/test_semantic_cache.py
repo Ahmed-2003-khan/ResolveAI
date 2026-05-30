@@ -319,3 +319,44 @@ async def test_run_with_cache_invokes_graph_on_miss() -> None:
 
     assert result["final_response"] == "Hello! How can I help?"
     mock_cache.set.assert_awaited_once_with("hello", "Hello! How can I help?")
+
+
+@pytest.mark.asyncio
+async def test_run_with_cache_does_not_store_personalized_response() -> None:
+    """Responses produced with tool calls must NOT be cached.
+
+    If two users ask 'mera order kahan hai?' the cache must not return
+    User A's order details to User B — so we skip caching any run that
+    used tools (tool_results non-empty).
+    """
+    from app.agent.graph import run_with_cache
+
+    graph_result = {
+        "conversation_id": "conv-test",
+        "user_message": "mera order ORD-001 kahan hai?",
+        "final_response": "ORD-001 dispatch ho chuka hai, TRK-PKG-001",
+        # tool_results is non-empty → personalized response
+        "tool_results": {"get_order_status": {"status": "dispatched", "order_id": "ORD-001"}},
+        "audit_trail": [],
+    }
+
+    mock_cache = AsyncMock()
+    mock_cache.get = AsyncMock(return_value=None)
+    mock_cache.set = AsyncMock()
+
+    mock_graph = AsyncMock()
+    mock_graph.ainvoke = AsyncMock(return_value=graph_result)
+
+    with patch("app.agent.graph.get_semantic_cache", return_value=mock_cache):
+        with patch("app.agent.graph.get_graph", return_value=mock_graph):
+            with patch("app.agent.graph.CACHE_MISSES"):
+                with patch("app.agent.graph.CACHE_HITS"):
+                    await run_with_cache(
+                        {
+                            "conversation_id": "conv-test",
+                            "user_message": "mera order ORD-001 kahan hai?",
+                        }
+                    )
+
+    # cache.set must NOT have been called — personal data cannot be shared
+    mock_cache.set.assert_not_awaited()

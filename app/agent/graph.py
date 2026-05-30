@@ -196,7 +196,19 @@ async def run_with_cache(
     result: dict = await graph.ainvoke(state, config)
 
     final_response = result.get("final_response")
-    if final_response:
+    # Only cache responses that required NO tool calls.
+    # Tool results contain personal data (order status, account balance, etc.)
+    # tied to a specific user — caching them would return one user's private
+    # information to a different user who asks a similar-sounding question.
+    # Generic KB/FAQ answers (no tools used) are safe to cache for everyone.
+    tools_were_called = bool(result.get("tool_results"))
+    if final_response and not tools_were_called:
         await cache.set(user_message, final_response)
+    elif final_response and tools_were_called:
+        log.info(
+            "cache_skip_personalized",
+            conversation_id=conversation_id,
+            tools_used=list(result.get("tool_results", {}).keys()),
+        )
 
     return result
