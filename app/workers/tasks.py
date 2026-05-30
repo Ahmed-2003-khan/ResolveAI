@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -11,6 +12,7 @@ from sqlalchemy import select
 
 from app.agent.graph import run_with_cache
 from app.core.db import async_session_factory
+from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.user_profile import UserProfile
@@ -231,28 +233,65 @@ async def _load_history(session, conversation_id: uuid.UUID) -> list[dict]:
 
 
 async def _persist_outbound(conversation_id: str, content: str, result: dict) -> None:
-    """Write the agent's reply to the messages table."""
-    if not content:
+    """Write the agent's reply and audit trail entries to the database."""
+    if not conversation_id:
         return
+    conv_uuid = uuid.UUID(conversation_id)
     async with async_session_factory() as session:
-        msg = Message(
-            conversation_id=uuid.UUID(conversation_id),
-            direction="outbound",
-            sender_type="agent",
-            content=content,
-            created_at=datetime.now(timezone.utc),
-            metadata_={
-                "intent": result.get("intent"),
-                "tools_used": list(result.get("tool_results", {}).keys()),
-                "cost_usd": result.get("total_cost_usd", 0),
-                "latency_ms": result.get("total_latency_ms", 0),
-            },
-        )
-        session.add(msg)
-        # Also update conversation last_activity
-        stmt = select(Conversation).where(Conversation.id == uuid.UUID(conversation_id))
+        # Always update conversation last_activity
+        stmt = select(Conversation).where(Conversation.id == conv_uuid)
         res = await session.execute(stmt)
         conv = res.scalar_one_or_none()
         if conv:
             conv.last_activity = datetime.now(timezone.utc)
+
+        msg_id: uuid.UUID | None = None
+        if content:
+            msg = Message(
+                conversation_id=conv_uuid,
+                direction="outbound",
+                sender_type="agent",
+                content=content,
+                created_at=datetime.now(timezone.utc),
+                metadata_={
+                    "intent": result.get("intent"),
+                    "tools_used": list(result.get("tool_results", {}).keys()),
+                    "cost_usd": result.get("total_cost_usd", 0),
+                    "latency_ms": result.get("total_latency_ms", 0),
+                },
+            )
+            session.add(msg)
+            await session.flush()  # get msg.id before audit rows reference it
+            msg_id = msg.id
+
+        # Persist every node's audit entry from the agent state
+        for entry in result.get("audit_trail", []):
+            raw_output = entry.get("output")
+            output_str = (
+                raw_output
+                if isinstance(raw_output, str) or raw_output is None
+                else json.dumps(raw_output, default=str)
+            )
+            raw_input = entry.get("input")
+            input_str = (
+                raw_input
+                if isinstance(raw_input, str) or raw_input is None
+                else json.dumps(raw_input, default=str)
+            )
+            audit = AuditLog(
+                conversation_id=conv_uuid,
+                message_id=msg_id,
+                node_name=entry.get("node"),
+                model_used=entry.get("model"),
+                prompt_version=entry.get("prompt_version"),
+                input_tokens=entry.get("input_tokens"),
+                output_tokens=entry.get("output_tokens"),
+                cost_usd=entry.get("cost_usd"),
+                latency_ms=entry.get("latency_ms"),
+                input_redacted=input_str,
+                output=output_str,
+                created_at=datetime.now(timezone.utc),
+            )
+            session.add(audit)
+
         await session.commit()

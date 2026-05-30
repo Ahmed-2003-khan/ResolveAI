@@ -111,6 +111,10 @@ async def websocket_chat(websocket: WebSocket, session_id: str) -> None:
             result = await _run_agent(msg)
             reply = result.get("final_response") or "I'm sorry, I couldn't process your request."
 
+            # Persist outbound message + audit trail (same as ARQ worker path)
+            from app.workers.tasks import _persist_outbound
+            await _persist_outbound(result.get("conversation_id", ""), reply, result)
+
             await connection_manager.send_text(session_id, reply)
 
     except WebSocketDisconnect:
