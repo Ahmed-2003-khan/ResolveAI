@@ -14,9 +14,14 @@ _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="reranker")
 
 
 class Reranker:
-    """Wraps BAAI/bge-reranker-v2-m3 with a lazy load and async interface."""
+    """Wraps a CrossEncoder reranker with a lazy load and async interface.
 
-    def __init__(self, model_name: str = "BAAI/bge-reranker-v2-m3") -> None:
+    Default model is cross-encoder/ms-marco-MiniLM-L-6-v2 (~85 MB) which
+    runs comfortably on 8 GB machines. Swap to BAAI/bge-reranker-v2-m3 on
+    servers with 16 GB+ RAM for higher quality.
+    """
+
+    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2") -> None:
         self._model_name = model_name
         self._model = None
 
@@ -58,4 +63,6 @@ class Reranker:
 
 @lru_cache(maxsize=1)
 def get_reranker() -> Reranker:
-    return Reranker()
+    import os
+    model = os.environ.get("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+    return Reranker(model_name=model)
