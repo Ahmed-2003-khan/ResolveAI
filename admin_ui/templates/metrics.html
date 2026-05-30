@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Metrics — ResolveAI Admin{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Metrics Summary</h4>
+
+<!-- Top stat cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card shadow-sm text-center">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-primary">
+          {{ conv_stats.values() | sum }}
+        </div>
+        <div class="text-muted">Total Conversations</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card shadow-sm text-center">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-success">
+          {{ msg_stats.values() | sum }}
+        </div>
+        <div class="text-muted">Total Messages</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card shadow-sm text-center">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-info">
+          {{ kb_count }}
+        </div>
+        <div class="text-muted">KB Chunks</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card shadow-sm text-center">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-warning">
+          ${{ "%.4f" | format(total_cost) }}
+        </div>
+        <div class="text-muted">Total LLM Cost (USD)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Conversation breakdown -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold">Conversations by Status</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for status_name, cnt in conv_stats.items() %}
+            <tr>
+              <td>
+                {% if status_name == 'active' %}
+                  <span class="badge bg-primary">active</span>
+                {% elif status_name == 'resolved' %}
+                  <span class="badge bg-success">resolved</span>
+                {% elif status_name == 'escalated' %}
+                  <span class="badge bg-danger">escalated</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ status_name }}</span>
+                {% endif %}
+              </td>
+              <td class="fw-bold text-end">{{ cnt }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-muted">No data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel breakdown -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold">Conversations by Channel</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for channel, cnt in channel_stats.items() %}
+            <tr>
+              <td>
+                {% if channel == 'whatsapp' %}
+                  <span class="badge bg-success">whatsapp</span>
+                {% elif channel == 'email' %}
+                  <span class="badge bg-info text-dark">email</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ channel }}</span>
+                {% endif %}
+              </td>
+              <td class="fw-bold text-end">{{ cnt }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-muted">No data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Message direction -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold">Messages by Direction</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for direction, cnt in msg_stats.items() %}
+            <tr>
+              <td>
+                {% if direction == 'inbound' %}
+                  <span class="badge bg-secondary">inbound</span>
+                {% else %}
+                  <span class="badge bg-primary">outbound</span>
+                {% endif %}
+              </td>
+              <td class="fw-bold text-end">{{ cnt }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-muted">No data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Per-node LLM stats -->
+<div class="card shadow-sm mt-4">
+  <div class="card-header fw-semibold">LLM Usage by Agent Node</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Node</th>
+            <th class="text-end">Calls</th>
+            <th class="text-end">Avg Latency (ms)</th>
+            <th class="text-end">Total Cost (USD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in audit_stats %}
+          <tr>
+            <td><span class="badge bg-primary">{{ row.node_name }}</span></td>
+            <td class="text-end">{{ row.calls }}</td>
+            <td class="text-end">
+              {% if row.avg_latency_ms %}{{ "%.0f" | format(row.avg_latency_ms) }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end">
+              {% if row.total_cost_usd %}${{ "%.5f" | format(row.total_cost_usd | float) }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="text-center text-muted py-4">No audit data yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

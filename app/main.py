@@ -1,9 +1,10 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
+from admin_ui.router import router as admin_router
 from app.api.v1.router import api_router
 from app.core.logging import setup_logging
 
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router)
+    app.include_router(admin_router)
 
     # Top-level WebSocket path used by widget.js: /ws/chat/{session_id}
     @app.websocket("/ws/chat/{session_id}")

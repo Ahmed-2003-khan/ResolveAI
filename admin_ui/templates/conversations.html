@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Conversations — ResolveAI Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0">Conversations
+    <span class="badge bg-secondary fs-6 ms-2">{{ total }}</span>
+  </h4>
+</div>
+
+<!-- Status filter (HTMX live filter) -->
+<form class="row g-2 mb-3"
+      hx-get="/admin/conversations"
+      hx-target="#conv-table-wrap"
+      hx-trigger="change from:select, submit"
+      hx-push-url="true">
+  <div class="col-auto">
+    <select name="status_filter" class="form-select form-select-sm">
+      <option value="" {% if not status_filter %}selected{% endif %}>All statuses</option>
+      <option value="active"    {% if status_filter == 'active'    %}selected{% endif %}>Active</option>
+      <option value="resolved"  {% if status_filter == 'resolved'  %}selected{% endif %}>Resolved</option>
+      <option value="escalated" {% if status_filter == 'escalated' %}selected{% endif %}>Escalated</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-outline-secondary" type="submit">Filter</button>
+  </div>
+</form>
+
+<div id="conv-table-wrap">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle bg-white rounded shadow-sm">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>Channel</th>
+          <th>Status</th>
+          <th>Messages</th>
+          <th>Last Activity</th>
+          <th>User ID</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for conv in conversations %}
+        <tr>
+          <td class="font-monospace text-muted small">{{ conv.id | string | truncate(12, True, '') }}</td>
+          <td>
+            {% if conv.channel == 'whatsapp' %}
+              <span class="badge bg-success">WhatsApp</span>
+            {% elif conv.channel == 'email' %}
+              <span class="badge bg-info text-dark">Email</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ conv.channel }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if conv.status == 'active' %}
+              <span class="badge bg-primary">active</span>
+            {% elif conv.status == 'resolved' %}
+              <span class="badge bg-success">resolved</span>
+            {% elif conv.status == 'escalated' %}
+              <span class="badge bg-danger">escalated</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ conv.status }}</span>
+            {% endif %}
+          </td>
+          <td>{{ msg_counts.get(conv.id, 0) }}</td>
+          <td class="small text-muted">
+            {% if conv.last_activity %}
+              {{ conv.last_activity.strftime('%Y-%m-%d %H:%M') }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="font-monospace text-muted small">
+            {% if conv.user_id %}{{ conv.user_id | string | truncate(12, True, '') }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <a href="/admin/conversations/{{ conv.id }}" class="btn btn-sm btn-outline-primary">
+              View
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No conversations found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if total > page_size %}
+  <nav>
+    <ul class="pagination pagination-sm">
+      {% if page > 1 %}
+      <li class="page-item">
+        <a class="page-link" href="?status_filter={{ status_filter }}&page={{ page - 1 }}">Prev</a>
+      </li>
+      {% endif %}
+      <li class="page-item disabled">
+        <span class="page-link">Page {{ page }} of {{ ((total - 1) // page_size) + 1 }}</span>
+      </li>
+      {% if page * page_size < total %}
+      <li class="page-item">
+        <a class="page-link" href="?status_filter={{ status_filter }}&page={{ page + 1 }}">Next</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

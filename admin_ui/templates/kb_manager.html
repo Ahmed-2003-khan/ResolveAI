@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Knowledge Base — ResolveAI Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0">Knowledge Base
+    <span class="badge bg-secondary fs-6 ms-2">{{ total }}</span>
+  </h4>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addChunkModal">
+    + Add Chunk
+  </button>
+</div>
+
+<!-- Search / filter bar -->
+<form class="row g-2 mb-3"
+      hx-get="/admin/kb"
+      hx-target="#kb-table-wrap"
+      hx-trigger="keyup[target.name=='q'] changed delay:400ms, change from:select, submit"
+      hx-push-url="true">
+  <div class="col-md-5">
+    <input type="text" name="q" class="form-control form-control-sm"
+           placeholder="Search content…" value="{{ q }}">
+  </div>
+  <div class="col-auto">
+    <select name="source_type" class="form-select form-select-sm">
+      <option value="" {% if not source_type %}selected{% endif %}>All types</option>
+      {% for st in source_types %}
+      <option value="{{ st }}" {% if source_type == st %}selected{% endif %}>{{ st }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-outline-secondary" type="submit">Search</button>
+  </div>
+</form>
+
+<div id="kb-table-wrap">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle bg-white rounded shadow-sm">
+      <thead class="table-dark">
+        <tr>
+          <th>Title</th>
+          <th>Source ID</th>
+          <th>Type</th>
+          <th>Product Area</th>
+          <th>Lang</th>
+          <th>Updated</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for chunk in chunks %}
+        <tr id="kb-row-{{ chunk.id }}">
+          <td>
+            <div class="fw-semibold">{{ chunk.title or '(no title)' | truncate(60) }}</div>
+            <div class="text-muted small">{{ chunk.content | truncate(100) }}</div>
+          </td>
+          <td class="font-monospace small text-muted">{{ chunk.source_id | truncate(20) }}</td>
+          <td><span class="badge bg-secondary">{{ chunk.source_type }}</span></td>
+          <td>{{ chunk.product_area or '—' }}</td>
+          <td>{{ chunk.language or '—' }}</td>
+          <td class="small text-muted">
+            {% if chunk.last_updated %}{{ chunk.last_updated.strftime('%Y-%m-%d') }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-outline-danger"
+                    hx-delete="/admin/kb/{{ chunk.id }}"
+                    hx-target="#kb-row-{{ chunk.id }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Delete this chunk?">
+              Delete
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No KB chunks found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if total > page_size %}
+  <nav>
+    <ul class="pagination pagination-sm">
+      {% if page > 1 %}
+      <li class="page-item">
+        <a class="page-link" href="?q={{ q }}&source_type={{ source_type }}&page={{ page - 1 }}">Prev</a>
+      </li>
+      {% endif %}
+      <li class="page-item disabled">
+        <span class="page-link">Page {{ page }} of {{ ((total - 1) // page_size) + 1 }}</span>
+      </li>
+      {% if page * page_size < total %}
+      <li class="page-item">
+        <a class="page-link" href="?q={{ q }}&source_type={{ source_type }}&page={{ page + 1 }}">Next</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Add Chunk Modal -->
+<div class="modal fade" id="addChunkModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="/admin/kb">
+        <div class="modal-header">
+          <h5 class="modal-title">Add KB Chunk</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Source ID <span class="text-danger">*</span></label>
+              <input type="text" name="source_id" class="form-control" required placeholder="e.g. faq-001">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Source Type <span class="text-danger">*</span></label>
+              <select name="source_type" class="form-select" required>
+                <option value="faq">faq</option>
+                <option value="policy">policy</option>
+                <option value="ticket">ticket</option>
+                <option value="article">article</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Title</label>
+              <input type="text" name="title" class="form-control" placeholder="Optional title">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Content <span class="text-danger">*</span></label>
+              <textarea name="content" class="form-control" rows="6" required></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Product Area</label>
+              <select name="product_area" class="form-select">
+                <option value="">—</option>
+                <option value="orders">orders</option>
+                <option value="refunds">refunds</option>
+                <option value="account">account</option>
+                <option value="policy">policy</option>
+                <option value="general">general</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Language</label>
+              <select name="language" class="form-select">
+                <option value="en">en</option>
+                <option value="ur">ur</option>
+                <option value="roman_ur">roman_ur</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Chunk</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Conversation {{ conv.id | string | truncate(8, True, '') }} — ResolveAI Admin{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="/admin/conversations" class="btn btn-sm btn-outline-secondary">&larr; Back</a>
+</div>
+
+<!-- Conversation header -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="text-muted small">Conversation ID</div>
+        <div class="font-monospace">{{ conv.id }}</div>
+      </div>
+      <div class="col-md-2">
+        <div class="text-muted small">Channel</div>
+        <div>
+          {% if conv.channel == 'whatsapp' %}
+            <span class="badge bg-success fs-6">WhatsApp</span>
+          {% elif conv.channel == 'email' %}
+            <span class="badge bg-info text-dark fs-6">Email</span>
+          {% else %}
+            <span class="badge bg-secondary fs-6">{{ conv.channel }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="text-muted small">Status</div>
+        <div>
+          {% if conv.status == 'active' %}
+            <span class="badge bg-primary fs-6">active</span>
+          {% elif conv.status == 'resolved' %}
+            <span class="badge bg-success fs-6">resolved</span>
+          {% elif conv.status == 'escalated' %}
+            <span class="badge bg-danger fs-6">escalated</span>
+          {% else %}
+            <span class="badge bg-secondary fs-6">{{ conv.status }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="text-muted small">Started</div>
+        <div>{% if conv.started_at %}{{ conv.started_at.strftime('%Y-%m-%d %H:%M') }}{% else %}—{% endif %}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">User ID</div>
+        <div class="font-monospace">{% if conv.user_id %}{{ conv.user_id }}{% else %}—{% endif %}</div>
+      </div>
+    </div>
+    {% if conv.assigned_human %}
+    <div class="mt-2">
+      <span class="text-muted small">Assigned to:</span>
+      <span class="badge bg-warning text-dark">{{ conv.assigned_human }}</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row">
+  <!-- Chat messages -->
+  <div class="col-lg-5 mb-4">
+    <h5 class="mb-3">Messages <span class="badge bg-secondary">{{ messages | length }}</span></h5>
+    <div class="bg-white rounded shadow-sm p-3" style="max-height:600px;overflow-y:auto;">
+      {% for msg in messages %}
+      <div class="d-flex {% if msg.direction == 'outbound' %}justify-content-end{% endif %} mb-2">
+        <div class="chat-bubble {% if msg.direction == 'inbound' %}msg-inbound{% else %}msg-outbound{% endif %}">
+          <div class="small fw-semibold mb-1">
+            {{ msg.sender_type }}
+            {% if msg.direction == 'inbound' %}
+              <span class="badge bg-light text-dark ms-1">in</span>
+            {% else %}
+              <span class="badge bg-light text-dark ms-1">out</span>
+            {% endif %}
+          </div>
+          <div>{{ msg.content }}</div>
+          <div class="small mt-1 opacity-75">
+            {% if msg.created_at %}{{ msg.created_at.strftime('%H:%M:%S') }}{% endif %}
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="text-muted text-center py-4">No messages.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Audit trail -->
+  <div class="col-lg-7 mb-4">
+    <h5 class="mb-3">Audit Trail (node-by-node) <span class="badge bg-secondary">{{ audit_logs | length }}</span></h5>
+    {% if audit_logs %}
+    <div class="d-flex flex-column gap-2" style="max-height:600px;overflow-y:auto;">
+      {% for log in audit_logs %}
+      <div class="card audit-card shadow-sm">
+        <div class="card-body py-2 px-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <span class="badge bg-primary node-badge me-1">{{ log.node_name or '—' }}</span>
+              {% if log.model_used %}
+                <span class="badge bg-secondary node-badge me-1">{{ log.model_used }}</span>
+              {% endif %}
+              {% if log.prompt_version %}
+                <span class="badge bg-light text-dark node-badge">v{{ log.prompt_version }}</span>
+              {% endif %}
+            </div>
+            <div class="text-muted small">
+              {% if log.created_at %}{{ log.created_at.strftime('%H:%M:%S') }}{% endif %}
+            </div>
+          </div>
+          <div class="row g-2 mt-1 small text-muted">
+            {% if log.latency_ms is not none %}
+            <div class="col-auto"><strong>{{ log.latency_ms }}</strong> ms</div>
+            {% endif %}
+            {% if log.input_tokens %}
+            <div class="col-auto">in: <strong>{{ log.input_tokens }}</strong> tok</div>
+            {% endif %}
+            {% if log.output_tokens %}
+            <div class="col-auto">out: <strong>{{ log.output_tokens }}</strong> tok</div>
+            {% endif %}
+            {% if log.cost_usd %}
+            <div class="col-auto">$<strong>{{ "%.5f" | format(log.cost_usd | float) }}</strong></div>
+            {% endif %}
+          </div>
+          {% if log.input_redacted %}
+          <details class="mt-2">
+            <summary class="small text-muted" style="cursor:pointer;">Input</summary>
+            <pre class="mt-1 p-2 bg-light rounded small">{{ log.input_redacted | truncate(400) }}</pre>
+          </details>
+          {% endif %}
+          {% if log.output %}
+          <details class="mt-1">
+            <summary class="small text-muted" style="cursor:pointer;">Output</summary>
+            <pre class="mt-1 p-2 bg-light rounded small">{{ log.output | truncate(400) }}</pre>
+          </details>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-muted text-center py-4 bg-white rounded shadow-sm">No audit entries yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
