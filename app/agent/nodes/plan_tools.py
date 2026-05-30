@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -17,6 +18,9 @@ from app.services.tools.registry import get_tool_registry
 log = structlog.get_logger(__name__)
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
+# Order IDs always look like ORD-123 or similar patterns
+_ORDER_ID_RE = re.compile(r"\bORD-\d+\b", re.IGNORECASE)
+
 
 def _kb_context_text(chunks: list[dict]) -> str:
     if not chunks:
@@ -26,6 +30,23 @@ def _kb_context_text(chunks: list[dict]) -> str:
         title = c.get("title") or c.get("source_id", f"Chunk {i}")
         parts.append(f"[{i}] {title}\n{c.get('content', '')}")
     return "\n\n".join(parts)
+
+
+def _filter_tools(tool_schemas: list[dict], state: AgentState) -> list[dict]:
+    """Remove tools whose required parameters cannot be satisfied from the message.
+
+    Specifically: hide get_order_status when no order ID is present in the
+    message.  This prevents the LLM from hallucinating an order ID.
+    """
+    message = (state.get("cleaned_content") or state.get("user_message") or "")
+    has_order_id = bool(_ORDER_ID_RE.search(message))
+    if has_order_id:
+        return tool_schemas
+    # Strip get_order_status so the LLM can't even attempt to call it
+    filtered = [t for t in tool_schemas if t.get("function", {}).get("name") != "get_order_status"]
+    if len(filtered) < len(tool_schemas):
+        log.info("plan_tools_hiding_get_order_status_no_id_in_message")
+    return filtered
 
 
 async def plan_tools(state: AgentState) -> dict:
@@ -49,7 +70,7 @@ async def plan_tools(state: AgentState) -> dict:
     ]
 
     registry = get_tool_registry()
-    tool_schemas = registry.openai_schemas()
+    tool_schemas = _filter_tools(registry.openai_schemas(), state)
 
     router = get_llm_router()
     result = await router.chat(

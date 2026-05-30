@@ -14,13 +14,11 @@ from app.services.tools.escalation import EscalateToHumanTool
 from app.services.tools.order import GetOrderStatusTool
 from app.services.tools.refund import CreateRefundRequestTool
 from app.services.tools.ticket import CreateSupportTicketTool
-from app.services.tools.user_orders import GetUserOrdersTool
 
 log = structlog.get_logger(__name__)
 
 # Canonical list of all tools (add new tools here).
 _ALL_TOOLS: list[Tool] = [
-    GetUserOrdersTool(),
     GetOrderStatusTool(),
     GetAccountBalanceTool(),
     GetRecentTransactionsTool(),
