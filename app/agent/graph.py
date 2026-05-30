@@ -187,7 +187,13 @@ async def run_with_cache(
     log.info("cache_miss", conversation_id=conversation_id)
 
     graph = get_graph(checkpointer)
-    result: dict = await graph.ainvoke(state, config or {})
+    # MemorySaver requires a thread_id; default to conversation_id so callers
+    # don't need to wire configurable manually.
+    if config is None:
+        config = {"configurable": {"thread_id": conversation_id or "default"}}
+    elif "configurable" not in config:
+        config = {**config, "configurable": {"thread_id": conversation_id or "default"}}
+    result: dict = await graph.ainvoke(state, config)
 
     final_response = result.get("final_response")
     if final_response:
