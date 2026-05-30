@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import structlog
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+
+from app.observability.metrics import CACHE_HITS, CACHE_MISSES
+from app.services.cache.semantic_cache import get_semantic_cache
+
+log = structlog.get_logger(__name__)
 
 from app.agent.nodes import (
     classify_intent,
@@ -136,3 +142,55 @@ def get_graph(checkpointer=None):
 
 # Friendly alias used in scripts and notebooks
 create_agent_graph = get_graph
+
+
+# ── Cache-aware entry point ───────────────────────────────────────────────────
+
+
+async def run_with_cache(
+    state: dict,
+    config: dict | None = None,
+    *,
+    checkpointer=None,
+) -> dict:
+    """Run the agent graph with a semantic cache layer.
+
+    1. Look up the user message in the semantic cache.
+    2. Cache hit  → return immediately with ``cache_hit=True`` in the audit trail.
+    3. Cache miss → invoke the full graph, then store the final response.
+
+    The cache service swallows its own errors so this function never raises due
+    to cache failures — it degrades gracefully to a plain graph run.
+    """
+    cache = get_semantic_cache()
+    user_message = state.get("user_message", "")
+    conversation_id = state.get("conversation_id", "")
+
+    cached_response = await cache.get(user_message)
+
+    if cached_response is not None:
+        CACHE_HITS.inc()
+        log.info("cache_hit", conversation_id=conversation_id)
+        return {
+            **state,
+            "final_response": cached_response,
+            "audit_trail": [
+                {
+                    "node": "semantic_cache",
+                    "cache_hit": True,
+                    "conversation_id": conversation_id,
+                }
+            ],
+        }
+
+    CACHE_MISSES.inc()
+    log.info("cache_miss", conversation_id=conversation_id)
+
+    graph = get_graph(checkpointer)
+    result: dict = await graph.ainvoke(state, config or {})
+
+    final_response = result.get("final_response")
+    if final_response:
+        await cache.set(user_message, final_response)
+
+    return result
