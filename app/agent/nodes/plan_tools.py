@@ -43,7 +43,6 @@ async def plan_tools(state: AgentState) -> dict:
                 intent=state.get("intent") or "general_inquiry",
                 user_message=state.get("cleaned_content") or state["user_message"],
                 kb_context=kb_context,
-                user_id=state.get("user_id") or "",
             )
             .strip(),
         ),
