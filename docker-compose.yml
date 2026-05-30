@@ -70,6 +70,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-resolveai}:${POSTGRES_PASSWORD:-resolveai}@db:5432/${POSTGRES_DB:-resolveai}
       REDIS_URL: redis://redis:6379/0
+      LANGFUSE_HOST: http://langfuse:3000
     volumes:
       - .:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -92,6 +93,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-resolveai}:${POSTGRES_PASSWORD:-resolveai}@db:5432/${POSTGRES_DB:-resolveai}
       REDIS_URL: redis://redis:6379/0
+      LANGFUSE_HOST: http://langfuse:3000
     volumes:
       - .:/app
     command: python -m arq app.workers.arq_settings.WorkerSettings

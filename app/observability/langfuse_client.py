@@ -81,17 +81,20 @@ def wrap_node(node_name: str, fn: Callable) -> Callable:
         if lf is not None:
             try:
                 trace_id = state.get("conversation_id") or None
+                user_message = (state.get("user_message") or "")[:500]
                 trace = lf.trace(
                     id=trace_id,
                     name="agent_run",
+                    # Set trace-level input once (first node sets it, later nodes just update)
+                    input={"user_message": user_message},
                     metadata={
                         "user_id": state.get("user_id"),
-                        "intent": state.get("intent"),
+                        "channel": (state.get("user_profile") or {}).get("channel", "web"),
                     },
                 )
                 span = trace.span(
                     name=node_name,
-                    input={"user_message": (state.get("user_message") or "")[:500]},
+                    input={"user_message": user_message},
                 )
             except Exception as exc:
                 log.debug("langfuse_span_start_failed", node=node_name, error=str(exc))
@@ -106,15 +109,22 @@ def wrap_node(node_name: str, fn: Callable) -> Callable:
                 output_summary = str(audit[0].get("output", ""))[:1000] if audit else ""
                 span.end(output=output_summary)
 
-                # Update trace tags once we know intent / escalation status
+                # Update trace: tags + output (final_response if this is the last node)
                 tags = [f"git_sha:{_get_git_sha()}"]
                 intent = result.get("intent") or state.get("intent")
                 if intent:
                     tags.append(f"intent:{intent}")
                 if result.get("should_escalate"):
                     tags.append("escalated:true")
+
+                trace_update: dict = {"tags": tags}
+                # send_reply and escalate are terminal nodes — set the trace output here
+                if node_name in ("send_reply", "escalate"):
+                    final = result.get("final_response") or output_summary
+                    trace_update["output"] = final[:1000] if final else None
+
                 if trace is not None:
-                    trace.update(tags=tags)
+                    trace.update(**trace_update)
             except Exception as exc:
                 log.debug("langfuse_span_end_failed", node=node_name, error=str(exc))
 
