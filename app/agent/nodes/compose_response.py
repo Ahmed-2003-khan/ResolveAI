@@ -10,6 +10,7 @@ import yaml
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import NODE_DURATION
 from app.services.llm.base import ChatMessage
 from app.services.llm.router import get_llm_router
 
@@ -72,6 +73,7 @@ async def compose_response(state: AgentState) -> dict:
 
     is_retry = state.get("draft_response") is not None
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="compose_response").observe(latency / 1000.0)
     log.info("node_compose_response", is_retry=is_retry, latency_ms=latency)
 
     updates: dict = {

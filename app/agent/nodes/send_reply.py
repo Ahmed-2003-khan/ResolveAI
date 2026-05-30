@@ -7,6 +7,7 @@ import time
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import NODE_DURATION
 
 log = structlog.get_logger(__name__)
 
@@ -15,6 +16,7 @@ async def send_reply(state: AgentState) -> dict:
     t0 = time.monotonic()
     final = state.get("draft_response") or ""
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="send_reply").observe(latency / 1000.0)
     log.info("node_send_reply", latency_ms=latency, response_len=len(final))
 
     return {

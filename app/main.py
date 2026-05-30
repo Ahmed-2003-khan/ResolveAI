@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from admin_ui.router import router as admin_router
 from app.api.v1.router import api_router
@@ -40,6 +42,10 @@ def create_app() -> FastAPI:
         from app.api.v1.inbound import websocket_chat
 
         await websocket_chat(websocket, session_id)
+
+    @app.get("/metrics", include_in_schema=False)
+    async def prometheus_metrics() -> Response:
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     # Serve static assets (widget.js, etc.)
     try:

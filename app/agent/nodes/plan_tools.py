@@ -11,6 +11,7 @@ import yaml
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import NODE_DURATION
 from app.services.llm.base import ChatMessage
 from app.services.llm.router import get_llm_router
 from app.services.tools.registry import get_tool_registry
@@ -94,6 +95,7 @@ async def plan_tools(state: AgentState) -> dict:
             tool_plan.append({"name": name, "arguments": arguments})
 
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="plan_tools").observe(latency / 1000.0)
     log.info("node_plan_tools", tools_planned=len(tool_plan), latency_ms=latency)
 
     return {

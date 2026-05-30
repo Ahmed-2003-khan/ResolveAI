@@ -7,6 +7,7 @@ import time
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import ESCALATIONS, NODE_DURATION
 
 log = structlog.get_logger(__name__)
 
@@ -28,6 +29,7 @@ async def escalate(state: AgentState) -> dict:
 
     if intent == "session_end":
         latency = int((time.monotonic() - t0) * 1000)
+        NODE_DURATION.labels(node="escalate").observe(latency / 1000.0)
         log.info("node_escalate_session_end", conversation_id=state.get("conversation_id"))
         return {
             "should_escalate": False,
@@ -50,6 +52,8 @@ async def escalate(state: AgentState) -> dict:
     )
 
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="escalate").observe(latency / 1000.0)
+    ESCALATIONS.labels(reason=reason).inc()
     log.info("node_escalate", reason=reason, conversation_id=state.get("conversation_id"))
 
     return {

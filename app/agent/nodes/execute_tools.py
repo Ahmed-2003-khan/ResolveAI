@@ -7,6 +7,7 @@ import time
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import NODE_DURATION
 from app.services.tools.registry import get_tool_registry
 
 log = structlog.get_logger(__name__)
@@ -30,6 +31,7 @@ async def execute_tools(state: AgentState) -> dict:
             tool_results[name] = {"error": str(exc)}
 
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="execute_tools").observe(latency / 1000.0)
     log.info(
         "node_execute_tools",
         tools_executed=len(tool_results),

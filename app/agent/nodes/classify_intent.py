@@ -9,6 +9,7 @@ import yaml
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import NODE_DURATION
 from app.services.llm.base import ChatMessage
 from app.services.llm.router import get_llm_router
 
@@ -51,6 +52,7 @@ async def classify_intent(state: AgentState) -> dict:
     intent = raw if raw in _VALID_INTENTS else "general_inquiry"
 
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="classify_intent").observe(latency / 1000.0)
     log.info("node_classify_intent", intent=intent, latency_ms=latency)
 
     return {

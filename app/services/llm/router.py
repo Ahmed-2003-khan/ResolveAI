@@ -8,6 +8,7 @@ import structlog
 
 from app.config import get_settings
 from app.core.exceptions import AllProvidersDownError
+from app.observability.metrics import LLM_COST, LLM_TOKENS, PROVIDER_FAILURES
 from app.services.llm.base import ChatMessage, ChatResult, LLMProvider, ModelTier
 from app.services.llm.groq_provider import GroqProvider
 from app.services.llm.ollama_provider import OllamaProvider
@@ -92,6 +93,9 @@ class LLMRouter:
             try:
                 result = await provider.chat(messages, model_tier=model_tier, **kwargs)
                 circuit.record_success()
+                LLM_COST.labels(provider=name, model=result.model).inc(result.cost_usd)
+                LLM_TOKENS.labels(provider=name, model=result.model, direction="input").inc(result.input_tokens)
+                LLM_TOKENS.labels(provider=name, model=result.model, direction="output").inc(result.output_tokens)
                 log.info(
                     "llm_call_success",
                     provider=name,
@@ -103,6 +107,7 @@ class LLMRouter:
             except Exception as exc:
                 last_error = exc
                 circuit.record_failure(window, threshold, cooldown)
+                PROVIDER_FAILURES.labels(provider=name).inc()
                 log.warning(
                     "llm_provider_failure",
                     provider=name,

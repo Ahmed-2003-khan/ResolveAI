@@ -7,6 +7,7 @@ import time
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import NODE_DURATION
 from app.services.pii.redactor import PIIRedactor
 
 log = structlog.get_logger(__name__)
@@ -20,6 +21,7 @@ async def redact_pii(state: AgentState) -> dict:
     result = _redactor.redact(state["user_message"])
 
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="redact_pii").observe(latency / 1000.0)
     log.info(
         "node_redact_pii",
         pii_tokens_found=len(result.pii_map),

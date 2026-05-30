@@ -16,6 +16,7 @@ from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.user_profile import UserProfile
+from app.observability.metrics import MESSAGES_RECEIVED, MESSAGES_SENT
 from app.schemas.message import InboundMessage, OutboundMessage
 from app.services.channels import get_channel_adapter
 
@@ -33,6 +34,7 @@ async def process_inbound_message(ctx: dict, message_data: dict) -> None:
         log.error("invalid_message_data", error=str(exc), data=message_data)
         return
 
+    MESSAGES_RECEIVED.labels(channel=msg.channel).inc()
     log.info(
         "processing_inbound_message",
         channel=msg.channel,
@@ -59,6 +61,7 @@ async def process_inbound_message(ctx: dict, message_data: dict) -> None:
                 content=final_response,
             )
             await adapter.send(out)
+            MESSAGES_SENT.labels(channel=msg.channel).inc()
 
         log.info(
             "message_processed",

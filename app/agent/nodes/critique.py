@@ -10,6 +10,7 @@ import yaml
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import CRITIQUE_SCORE, NODE_DURATION
 from app.services.llm.base import ChatMessage
 from app.services.llm.router import get_llm_router
 
@@ -68,6 +69,8 @@ async def critique(state: AgentState) -> dict:
         log.warning("critique_parse_failed", error=str(exc), raw=result.content[:200])
 
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="critique").observe(latency / 1000.0)
+    CRITIQUE_SCORE.observe(score)
     log.info("node_critique", score=score, latency_ms=latency)
 
     return {

@@ -6,6 +6,7 @@ import structlog
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from app.observability.langfuse_client import wrap_node
 from app.observability.metrics import CACHE_HITS, CACHE_MISSES
 from app.services.cache.semantic_cache import get_semantic_cache
 
@@ -66,16 +67,16 @@ def build_graph(checkpointer=None):
     """
     workflow = StateGraph(AgentState)
 
-    # Register nodes
-    workflow.add_node("classify_intent", classify_intent)
-    workflow.add_node("redact_pii", redact_pii)
-    workflow.add_node("retrieve", retrieve)
-    workflow.add_node("plan_tools", plan_tools)
-    workflow.add_node("execute_tools", execute_tools)
-    workflow.add_node("compose_response", compose_response)
-    workflow.add_node("critique", critique)
-    workflow.add_node("escalate", escalate)
-    workflow.add_node("send_reply", send_reply)
+    # Register nodes — each wrapped with a Langfuse span for distributed tracing
+    workflow.add_node("classify_intent", wrap_node("classify_intent", classify_intent))
+    workflow.add_node("redact_pii", wrap_node("redact_pii", redact_pii))
+    workflow.add_node("retrieve", wrap_node("retrieve", retrieve))
+    workflow.add_node("plan_tools", wrap_node("plan_tools", plan_tools))
+    workflow.add_node("execute_tools", wrap_node("execute_tools", execute_tools))
+    workflow.add_node("compose_response", wrap_node("compose_response", compose_response))
+    workflow.add_node("critique", wrap_node("critique", critique))
+    workflow.add_node("escalate", wrap_node("escalate", escalate))
+    workflow.add_node("send_reply", wrap_node("send_reply", send_reply))
 
     # Entry point
     workflow.add_edge(START, "classify_intent")

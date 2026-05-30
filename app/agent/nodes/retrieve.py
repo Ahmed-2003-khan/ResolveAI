@@ -7,6 +7,7 @@ import time
 import structlog
 
 from app.agent.state import AgentState
+from app.observability.metrics import NODE_DURATION
 from app.services.rag.retriever import get_retriever
 
 log = structlog.get_logger(__name__)
@@ -25,6 +26,7 @@ async def retrieve(state: AgentState) -> dict:
     chunks = await retriever.retrieve(query, filters=filters, k=5)
 
     latency = int((time.monotonic() - t0) * 1000)
+    NODE_DURATION.labels(node="retrieve").observe(latency / 1000.0)
     log.info("node_retrieve", chunks_returned=len(chunks), latency_ms=latency)
 
     return {
