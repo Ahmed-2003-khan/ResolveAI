@@ -329,6 +329,11 @@ class MockCRMService:
     async def get_order(self, order_id: str) -> Order | None:
         return self._orders.get(order_id)
 
+    async def get_orders_by_user(self, user_id: str) -> list[Order]:
+        """Return all orders for a user, newest first."""
+        orders = [o for o in self._orders.values() if o.user_id == user_id]
+        return sorted(orders, key=lambda o: o.placed_at, reverse=True)
+
     async def get_account(self, user_id: str) -> Account | None:
         return self._accounts.get(user_id)
 
