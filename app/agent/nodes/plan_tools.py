@@ -63,6 +63,7 @@ async def plan_tools(state: AgentState) -> dict:
             content=prompt["user"]
             .format(
                 intent=state.get("intent") or "general_inquiry",
+                user_id=state.get("user_id") or "unknown",
                 user_message=state.get("cleaned_content") or state["user_message"],
                 kb_context=kb_context,
             )
