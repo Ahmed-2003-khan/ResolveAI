@@ -1,4 +1,4 @@
-.PHONY: up down restart logs migrate seed ingest test eval lint fmt typecheck worker shell psql redis-cli help
+.PHONY: up down restart logs migrate seed ingest test eval eval-smoke eval-no-judge lint fmt typecheck worker shell psql redis-cli help
 
 # ── Docker ───────────────────────────────────────────────────────────────────
 up:
@@ -47,7 +47,15 @@ test-integration:
 	docker compose exec api pytest tests/integration -v
 
 eval:
-	docker compose exec api python tests/eval/run_eval.py
+	docker compose exec api python tests/eval/run_eval.py --html reports/eval_report.html
+	@echo "Report saved to reports/eval_report.html"
+
+eval-smoke:
+	docker compose exec api python tests/eval/run_eval.py --limit 10 --html reports/eval_smoke.html
+	@echo "Smoke report saved to reports/eval_smoke.html"
+
+eval-no-judge:
+	docker compose exec api python tests/eval/run_eval.py --no-judge --html reports/eval_report.html
 
 # ── Lint / format / type-check ───────────────────────────────────────────────
 lint:
@@ -79,7 +87,9 @@ help:
 	@echo "  seed          - Seed user/order data"
 	@echo "  ingest        - Ingest KB articles into pgvector"
 	@echo "  test          - Run unit + integration tests with coverage"
-	@echo "  eval          - Run the eval harness"
+	@echo "  eval          - Run the full eval harness (writes reports/eval_report.html)"
+	@echo "  eval-smoke    - Run first 10 cases only (fast smoke test)"
+	@echo "  eval-no-judge - Run without LLM judge (no rubric scores, faster)"
 	@echo "  lint          - Run ruff + black checks"
 	@echo "  fmt           - Auto-fix lint + format"
 	@echo "  typecheck     - Run mypy"

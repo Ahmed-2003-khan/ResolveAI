@@ -72,3 +72,6 @@ redis_data/
 # Logs
 *.log
 logs/
+
+# Eval reports (generated, not committed)
+reports/*.html

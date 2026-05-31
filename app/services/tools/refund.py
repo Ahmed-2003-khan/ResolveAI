@@ -63,7 +63,7 @@ class CreateRefundRequestTool(Tool):
             amount_pkr=amount,
             message=(
                 f"Refund request {refund.request_id} submitted successfully. "
-                "It will be reviewed within 3–5 business days."
+                "It will be reviewed within 3-5 business days."
             ),
         )
         log.info(
