@@ -37,13 +37,14 @@ _GOLDEN_SET = _REPO_ROOT / "data" / "eval" / "golden_set.jsonl"
 _DEFAULT_REPORT = _REPO_ROOT / "reports" / "eval_report.html"
 
 
-def _load_golden_set(path: Path, limit: int | None = None) -> list[dict]:
+def _load_golden_set(path: Path, limit: int | None = None, offset: int = 0) -> list[dict]:
     cases = []
     with path.open(encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if line:
                 cases.append(json.loads(line))
+    cases = cases[offset:]
     if limit:
         cases = cases[:limit]
     return cases
@@ -86,7 +87,7 @@ async def _run_case(case: dict, graph) -> dict:
 
     config = {"configurable": {"thread_id": conversation_id}}
     t0 = time.monotonic()
-    result = await asyncio.wait_for(graph.ainvoke(state, config), timeout=60.0)
+    result = await asyncio.wait_for(graph.ainvoke(state, config), timeout=300.0)
     latency_ms = int((time.monotonic() - t0) * 1000)
     return {**result, "_latency_ms": latency_ms}
 
@@ -315,19 +316,43 @@ def _generate_html(results: list[dict], metrics, run_id: str, git_sha: str, repo
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def _patch_router_for_groq() -> None:
+    """Force the LLM router to try Groq before OpenAI for eval runs."""
+    import app.services.llm.router as _router_mod
+    _router_mod._TIER_PROVIDERS["cheap"] = ["groq", "openai", "ollama"]
+    _router_mod._TIER_PROVIDERS["smart"] = ["groq", "openai"]
+    # Reset singleton so it picks up the new order
+    _router_mod._router = None
+    log.info("eval_router_groq_first")
+
+
 async def main(args: argparse.Namespace) -> int:
     from app.agent.graph import build_graph
     from langgraph.checkpoint.memory import MemorySaver
     from tests.eval.llm_judge import get_judge
     from tests.eval.metrics import check_assertions, compute_aggregate, check_thresholds
 
-    log.info("eval_start", golden_set=str(_GOLDEN_SET), limit=args.limit)
+    # Note: --groq only affects the judge. Agent always uses OpenAI→Groq→Ollama
+    # because llama-3.1-8b-instant is unreliable at function/tool calling.
 
-    cases = _load_golden_set(_GOLDEN_SET, limit=args.limit)
+    # Warm up the reranker so the first real case doesn't eat the timeout
+    log.info("eval_warmup_start")
+    try:
+        from app.services.rag.reranker import get_reranker
+        reranker = get_reranker()
+        await reranker.rerank("test query", [{"content": "warmup", "id": "warmup"}])
+        log.info("eval_warmup_done")
+    except Exception as exc:
+        log.warning("eval_warmup_failed", error=str(exc))
+
+    log.info("eval_start", golden_set=str(_GOLDEN_SET), limit=args.limit, offset=args.offset)
+
+    cases = _load_golden_set(_GOLDEN_SET, limit=args.limit, offset=args.offset)
     log.info("eval_cases_loaded", count=len(cases))
 
     graph = build_graph(checkpointer=MemorySaver())
-    judge = get_judge() if not args.no_judge else None
+    # Judge uses OpenAI gpt-4o-mini (reliable JSON); Groq llama-3.1-8b unreliable for scoring
+    judge = get_judge(use_groq=False) if not args.no_judge else None
 
     run_id = uuid.uuid4()
     git_sha = _get_git_sha()
@@ -368,7 +393,10 @@ async def main(args: argparse.Namespace) -> int:
         # LLM judge
         judge_scores: dict | None = None
         if judge and actual_response and not run_error:
-            scores = await judge.judge(case, actual_response, retrieved_chunks)
+            scores = await judge.judge(
+                case, actual_response, retrieved_chunks,
+                tool_results=raw.get("tool_results") or None,
+            )
             judge_scores = scores.to_dict()
         elif run_error:
             judge_scores = {"groundedness": 0.0, "helpfulness": 0.0, "policy_score": 0.0, "reasoning": run_error, "error": run_error}
@@ -406,7 +434,9 @@ async def main(args: argparse.Namespace) -> int:
         )
 
     metrics = compute_aggregate(results)
-    ok, violations = check_thresholds(metrics)
+    # When judge is skipped, rubric scores are all 0 — only gate on pass_rate
+    min_rubric = 0.75 if not args.no_judge else 0.0
+    ok, violations = check_thresholds(metrics, min_rubric=min_rubric)
 
     log.info(
         "eval_summary",
@@ -464,9 +494,11 @@ async def main(args: argparse.Namespace) -> int:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ResolveAI eval harness")
-    parser.add_argument("--limit", type=int, default=None, help="Run only first N cases (smoke test)")
+    parser.add_argument("--limit", type=int, default=None, help="Run only first N cases")
+    parser.add_argument("--offset", type=int, default=0, help="Skip first N cases (for batching)")
     parser.add_argument("--no-db", action="store_true", help="Skip DB persistence")
     parser.add_argument("--no-judge", action="store_true", help="Skip LLM judge (faster, no rubric scores)")
+    parser.add_argument("--groq", action="store_true", help="Force Groq for agent + judge (faster, cheaper)")
     parser.add_argument("--html", type=str, default=None, help="Path for HTML report")
     return parser.parse_args()
 

@@ -24,15 +24,18 @@ You will receive:
 - The original customer message
 - The agent's response
 - The expected ground-truth answer (for reference)
-- Any retrieved KB context (may be empty)
+- Tool results the agent received (live data from CRM — use this to verify facts)
+- Retrieved KB context
 
 Score the agent response on EXACTLY these three rubrics. Each score must be a float between 0.0 and 1.0 (two decimal places).
 
 RUBRICS:
 1. groundedness (0.0-1.0):
-   - 1.0: All factual claims in the response are supported by context/tool results or are clearly general knowledge.
-   - 0.5: Mostly grounded but contains one unsupported claim.
-   - 0.0: Response contains fabricated facts not supported by any context.
+   - 1.0: All factual claims in the response match the tool results or KB context exactly.
+   - 0.5: Mostly grounded but one claim cannot be verified from provided data.
+   - 0.0: Response contains facts that contradict the tool results, or are clearly hallucinated.
+   NOTE: If tool_results are provided, use them as the primary source of truth for facts like
+   order status, balance, tracking number, etc.
 
 2. helpfulness (0.0-1.0):
    - 1.0: Fully resolves the customer query. Actionable, specific, nothing important missing.
@@ -60,7 +63,11 @@ Agent response: {actual_response}
 
 Ground-truth answer (reference only): {ground_truth}
 
-Retrieved context snippet (first 400 chars): {context_snippet}
+Tool results (live CRM data — primary source of truth for facts):
+{tool_results}
+
+Retrieved KB context (first 600 chars):
+{context_snippet}
 
 Score the agent response:"""
 
@@ -97,18 +104,37 @@ class JudgeScores:
 
 
 class LLMJudge:
-    """Singleton LLM judge using the LLMRouter (falls back to Groq / Ollama)."""
+    """LLM judge using OpenAI gpt-4o-mini — reliable structured JSON output."""
+
+    def __init__(self, use_groq: bool = False) -> None:
+        # use_groq kept for backwards compat but defaults False — Groq llama-3.1-8b
+        # returns inconsistent JSON scores; gpt-4o-mini is far more reliable here.
+        self._use_groq = use_groq
+        self._groq: "GroqProvider | None" = None
+
+    def _get_groq(self):
+        if self._groq is None:
+            from app.services.llm.groq_provider import GroqProvider
+            self._groq = GroqProvider()
+        return self._groq
 
     async def judge(
         self,
         case: dict,
         actual_response: str,
         retrieved_chunks: list[dict] | None = None,
+        tool_results: dict | None = None,
     ) -> JudgeScores:
+        # Build KB context from all retrieved chunks (up to 600 chars total)
         context_snippet = ""
         if retrieved_chunks:
-            first_chunk = retrieved_chunks[0] if retrieved_chunks else {}
-            context_snippet = str(first_chunk.get("content", ""))[:400]
+            parts = [c.get("content", "") for c in retrieved_chunks if c.get("content")]
+            context_snippet = " | ".join(parts)[:600]
+
+        # Format tool results as readable JSON for the judge
+        tool_results_text = "(no tools were called)"
+        if tool_results:
+            tool_results_text = json.dumps(tool_results, indent=2, default=str)[:800]
 
         messages = [
             ChatMessage(role="system", content=_JUDGE_SYSTEM.strip()),
@@ -118,14 +144,18 @@ class LLMJudge:
                     user_message=case.get("user_message", ""),
                     actual_response=actual_response,
                     ground_truth=case.get("ground_truth_answer", ""),
+                    tool_results=tool_results_text,
                     context_snippet=context_snippet,
                 ).strip(),
             ),
         ]
 
         try:
-            router = get_llm_router()
-            result = await router.chat(messages, model_tier="cheap", max_tokens=200)
+            if self._use_groq:
+                result = await self._get_groq().chat(messages, model_tier="cheap", max_tokens=200)
+            else:
+                router = get_llm_router()
+                result = await router.chat(messages, model_tier="cheap", max_tokens=200)
             raw = result.content.strip()
 
             # Strip markdown code fences if present
@@ -152,8 +182,8 @@ class LLMJudge:
 _judge: LLMJudge | None = None
 
 
-def get_judge() -> LLMJudge:
+def get_judge(use_groq: bool = True) -> LLMJudge:
     global _judge
     if _judge is None:
-        _judge = LLMJudge()
+        _judge = LLMJudge(use_groq=use_groq)
     return _judge
