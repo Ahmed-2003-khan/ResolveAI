@@ -345,9 +345,12 @@ async def main(args: argparse.Namespace) -> int:
     except Exception as exc:
         log.warning("eval_warmup_failed", error=str(exc))
 
-    log.info("eval_start", golden_set=str(_GOLDEN_SET), limit=args.limit, offset=args.offset)
+    log.info("eval_start", golden_set=str(_GOLDEN_SET), limit=args.limit, offset=args.offset, cases=args.cases)
 
     cases = _load_golden_set(_GOLDEN_SET, limit=args.limit, offset=args.offset)
+    if args.cases:
+        filter_ids = {c.strip() for c in args.cases.split(",")}
+        cases = [c for c in cases if c.get("case_id") in filter_ids]
     log.info("eval_cases_loaded", count=len(cases))
 
     graph = build_graph(checkpointer=MemorySaver())
@@ -496,6 +499,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ResolveAI eval harness")
     parser.add_argument("--limit", type=int, default=None, help="Run only first N cases")
     parser.add_argument("--offset", type=int, default=0, help="Skip first N cases (for batching)")
+    parser.add_argument("--cases", type=str, default=None, help="Comma-separated list of case_ids to run (e.g. tkt_002,ref_009)")
     parser.add_argument("--no-db", action="store_true", help="Skip DB persistence")
     parser.add_argument("--no-judge", action="store_true", help="Skip LLM judge (faster, no rubric scores)")
     parser.add_argument("--groq", action="store_true", help="Force Groq for agent + judge (faster, cheaper)")

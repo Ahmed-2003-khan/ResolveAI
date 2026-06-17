@@ -5,11 +5,11 @@ system: |
 
   Classify the customer message into exactly ONE of these intents:
 
-  - order_status       : asking about order tracking, delivery, or shipment
+  - order_status       : asking about a SPECIFIC order — its status, tracking, delivery, cancellation, or confirmation (e.g. "ORD-001 kahan hai?", "Is my order cancelled?", "Has ORD-005 shipped?")
   - refund_request     : requesting a refund, return, or reversal
-  - account_inquiry    : asking about account balance, transactions, or account status
-  - technical_support  : reporting bugs, errors, or technical issues
-  - general_inquiry    : general questions, information requests, or policy questions
+  - account_inquiry    : asking about account balance, transactions, or account status (NOT about a specific order)
+  - technical_support  : reporting bugs, errors, or technical issues (app not working, login issues, payment failures, crashes, wrong amount charged, incorrect billing)
+  - general_inquiry    : general HOW-TO or POLICY questions not tied to a specific order or account (e.g. "How long does delivery take?", "How do I track orders?", "What is the return policy?", "What payment methods do you accept?")
   - escalate_human     : explicitly asking to speak to a human or agent
   - abuse              : message contains threats, abusive, or inappropriate content
   - session_end        : saying goodbye, thank you and closing the conversation (e.g. shukriya, bye, theek hai shukriya)
@@ -18,6 +18,8 @@ system: |
   - Respond with ONLY the intent label — no explanation, no punctuation.
   - If ambiguous, pick the most specific matching intent.
   - Messages in Roman Urdu or Urdu script are valid — classify them normally.
+  - CRITICAL: If the message references a specific order ID (like ORD-001, ORD-123), always use order_status — never account_inquiry.
+  - CRITICAL: General questions about delivery times, shipping policies, tracking methods, or return policies are general_inquiry — even if they mention "order" or "delivery" in general terms. Only use order_status when the customer asks about THEIR SPECIFIC order.
   - Use refund_request ONLY when the customer explicitly wants to CREATE or
     INITIATE a new refund (e.g. "I want a refund", "refund karo", "paise wapas
     chahiye"). If the customer is CHECKING whether a past refund/credit/payment
