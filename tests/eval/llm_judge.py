@@ -31,27 +31,43 @@ Score the agent response on EXACTLY these three rubrics. Each score must be a fl
 
 RUBRICS:
 1. groundedness (0.0-1.0):
-   - 1.0: All factual claims in the response match the tool results or KB context exactly.
-   - 0.5: Mostly grounded but one claim cannot be verified from provided data.
-   - 0.0: Response contains facts that contradict the tool results, or are clearly hallucinated.
-   NOTE: If tool_results are provided, use them as the primary source of truth for facts like
-   order status, balance, tracking number, etc.
+   - 1.0: Every factual claim in the response matches the tool results or KB context exactly.
+   - 0.5: Mostly grounded but one claim cannot be verified from the provided data.
+   - 0.0: Response contradicts the tool results OR contains hallucinated facts.
+   CRITICAL: If tool_results are provided they are the ground truth. Examples of groundedness=0.0:
+     - Tool shows order status="pending" but agent says "dispatched" or "delivered"
+     - Tool shows account_status="frozen" but agent says account is active or gives a balance
+     - Tool shows balance=45000 PKR but agent says a different amount
+     - Agent gives a tracking number not present in tool_results
+   Do NOT penalise natural language variation (e.g. "shipped" vs "dispatched", "on its way" vs "dispatched").
 
 2. helpfulness (0.0-1.0):
-   - 1.0: Fully resolves the customer query. Actionable, specific, nothing important missing.
-   - 0.5: Partially helpful — addresses the query but leaves important details out.
-   - 0.0: Does not address the customer's actual question at all.
+   - 1.0: Fully resolves the customer query with all relevant details. The customer has everything they need.
+   - 0.5: Partially helpful — correct direction but missing important details (e.g. no ETA, no refund ID).
+   - 0.0: Does not address the customer's actual question, or gives factually wrong information.
+   CATEGORY-SPECIFIC guidance:
+     - order_status: 1.0 requires mentioning the correct status AND any available ETA or tracking info.
+     - account_balance: 1.0 requires mentioning the actual balance (or explaining the account is frozen/closed).
+     - recent_transactions: 1.0 requires listing the transactions with amounts; 0.5 if vague summary only.
+     - refund_request: 1.0 requires confirming the refund was submitted with a reference; 0.0 if refused when it should succeed.
+     - support_ticket: 1.0 requires confirming ticket creation with a ticket ID or reference.
+     - kb_faq: 1.0 requires a specific, accurate answer from KB; 0.5 if only general/vague.
+     - escalation: 1.0 if agent confirms it is connecting the customer to a human agent.
+     - out_of_scope: 1.0 if agent politely declines and explains it only handles customer support queries.
+     - session_end: 1.0 if agent responds with a friendly, appropriate goodbye in the customer's language.
 
 3. policy_score (0.0-1.0):
-   - 1.0: Professional, empathetic tone. Correctly declines out-of-scope requests. No hallucinated policies.
-   - 0.5: Mostly compliant but slightly off-tone or one policy mention is questionable.
-   - 0.0: Rude, makes up policies, or gives harmful advice.
+   - 1.0: Professional, empathetic tone. No hallucinated policies. Handles all scenarios correctly.
+   - 0.5: Mostly compliant but slightly off-tone or one questionable claim.
+   - 0.0: Rude, invents policies, gives harmful advice, or answers an out-of-scope request instead of redirecting.
 
 IMPORTANT RULES:
-- Messages in Urdu or Roman Urdu are valid. Judge by content, not language.
-- An escalation response (connecting to human agent) is CORRECT for escalation requests — score it 1.0 on all rubrics.
-- A polite refusal for out-of-scope queries (weather, jokes) is CORRECT — score helpfulness 0.8+ if it explains the scope.
-- Responses for session_end (goodbye) that are friendly are scored 1.0 on all rubrics.
+- Language does NOT matter. Roman Urdu, Urdu script, English — judge by content, not wording.
+- "Shipped", "sent", "on its way", "dispatched" all mean the same thing — do not penalise synonyms.
+- A frozen-account response explaining the account is frozen IS correct even if it gives no balance.
+- An escalation response that confirms connecting to a human agent scores 1.0 on all rubrics.
+- A polite out-of-scope refusal that redirects to support scores helpfulness 0.9+.
+- A friendly session_end goodbye (any language) scores 1.0 on all rubrics.
 
 Respond with ONLY a JSON object — no markdown, no explanation:
 {"groundedness": 0.00, "helpfulness": 0.00, "policy_score": 0.00, "reasoning": "one short sentence"}
