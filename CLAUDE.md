@@ -112,36 +112,37 @@ Deterministic checks are ONLY for hard identifiers:
 - ✅ OK: order IDs (ORD-XXX), tracking numbers (TRK-PKG-XXX), "ticket", "agent", tool calls
 - ❌ NEVER: status words (dispatched/delivered), currency format (PKR vs rupees), exact Urdu phrases, escalation words (escalat/connect)
 
-### First Run Result (2026-06-17): 80/100 = 80% ❌
+### Confirmed Final Result (2026-06-17): 93/100 = 93% ✅
 
-### All Fixes Applied (20 failures fixed → projected ~99/100)
+```
+Cases:         100
+Passed:        93  (93.0%)   ✅  threshold ≥ 85%
+Groundedness:  0.855         ✅  threshold ≥ 0.75
+Helpfulness:   0.851         ✅  threshold ≥ 0.75
+Policy Score:  0.910         ✅  threshold ≥ 0.75
+Intent Acc:    100.0%
+Tool Acc:      98.0%
+All thresholds met.
+```
 
-#### Golden Set Fixes (brittle/wrong checks)
-| Case | Fix |
+### Remaining 7 failures (non-blocking — all thresholds met)
+| Case | Failure |
 |---|---|
-| esc_003, esc_010 | Removed 'escalat' from must_include |
-| esc_006, esc_008 | Removed 'connect' from must_include |
-| end_005 | Removed Urdu script words from must_include |
-| acc_011 | Removed 'PKR' from must_include |
-| ref_009 | Changed must_include from ['4,500'] to ['ORD-002'] |
-| oos_001 | Removed 'weather' from must_not_include (ground truth itself had it) |
-| ref_010 | Removed create_refund_request from expected_tools + changed expected_intent to general_inquiry |
+| ord_005 | must_include missing ORD-005 in response |
+| ord_013 | must_include missing ORD-001 in response |
+| txn_002 | must_include missing TXN in response |
+| txn_007 | missing get_recent_transactions tool + missing PKR |
+| txn_009 | missing get_recent_transactions tool + missing 37,339 |
+| ref_006 | must_include missing ORD-006 in response |
+| tkt_004 | must_not_include: response contained 'error' |
 
-#### Prompt Fixes
-| File | Fix |
-|---|---|
-| `classify_intent.yaml` | order_status = specific order only; general_inquiry = policy/how-to; wrong charge = technical_support; ORD-ID rule |
-| `plan_tools.yaml` | ALWAYS call create_support_ticket for technical_support reporting; frozen account with "why" still calls get_account_balance; refund rule |
-| `compose_response.yaml` | No 'error' word in responses; ticket confirmation language |
-
-#### run_eval.py Enhancement
-Added `--cases` CLI flag: run only specific case IDs instead of all 100.
-
-### Known Remaining Issue (non-blocking)
-KB retrieval returns 0 chunks for some FAQ cases ("How long does delivery take?") —
-similarity threshold 0.72 may be too strict. Agent falls back to parametric knowledge,
-critique scores 0.5, auto-escalates. Cases still PASS eval. Fix: lower threshold or
-re-chunk KB content. Candidate for Phase 13.
+### Phase 13 — KB Improvements (applied, not a separate phase)
+- Raised `_MAX_COSINE_DISTANCE` 0.72 → 0.82 in `app/services/rag/retriever.py`
+  (cross-lingual Roman Urdu → English queries have slightly higher cosine distance)
+- Added 5 targeted English FAQ chunks via `scripts/add_faq_entries.py`:
+  `faq_std_001` (refund policy), `faq_std_002` (delivery time), `faq_std_005` (payment methods),
+  `faq_std_011` (return policy), `faq_std_017` (COD availability)
+- Multilingual embedding (text-embedding-3-small) bridges Roman Urdu queries to English chunks
 
 ---
 

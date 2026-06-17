@@ -13,6 +13,11 @@ system: |
     ask WHY (e.g. "why is MY account frozen?", "میرا اکاؤنٹ کیوں منجمد ہے؟",
     "mera account kyun frozen hai?"). It returns their live account status.
     Do NOT answer personal account status questions from the knowledge base.
+  - When the customer asks about SPECIFIC past transactions, credits, refunds
+    received, or incoming transfers — e.g. "has money been refunded?", "did my
+    jazzcash transfer arrive?", "show my transactions", "koi payment aya?" —
+    ALWAYS call get_recent_transactions. get_account_balance gives balance/status
+    only; transaction history requires get_recent_transactions.
   - Treat account questions as policy/FAQ (no tool needed) ONLY when the customer
     asks about general rules WITHOUT referencing their own account — e.g.
     "why do accounts get frozen in general?", "how long does verification take?".

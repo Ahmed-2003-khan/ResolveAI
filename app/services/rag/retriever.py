@@ -21,9 +21,10 @@ _PRE_RERANK = 20
 
 # Coarse cosine-distance cutoff for dense candidates. text-embedding-3-small
 # puts clearly off-topic chunks above ~0.72; we keep everything below this and
-# let the cross-encoder reranker do the fine-grained ordering. Tuned to be
-# lenient on purpose — the reranker, not this cutoff, separates near-ties.
-_MAX_COSINE_DISTANCE = 0.72
+# let the cross-encoder reranker do the fine-grained ordering. Raised to 0.82
+# to handle cross-lingual queries (Roman Urdu → English KB) where the distance
+# is slightly higher than same-language pairs. Reranker handles the filtering.
+_MAX_COSINE_DISTANCE = 0.82
 
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
