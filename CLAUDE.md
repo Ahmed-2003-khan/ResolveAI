@@ -33,6 +33,7 @@ in Roman Urdu, Urdu script, and English.
 | 10 | Critique + retry loop | ✅ |
 | 11 | DB persistence + seed | ✅ |
 | 12 | Eval harness (100-case golden set, LLM judge, HTML report) | ✅ |
+| 13 | CI/CD (GitHub Actions lint + test + eval-smoke + GHCR deploy) | ✅ |
 
 ---
 
@@ -136,7 +137,38 @@ All thresholds met.
 | ref_006 | must_include missing ORD-006 in response |
 | tkt_004 | must_not_include: response contained 'error' |
 
-### Phase 13 — KB Improvements (applied, not a separate phase)
+### Phase 13 — CI/CD
+
+**Files**
+- `.github/workflows/ci.yml` — 3 jobs: lint → test → eval-smoke (main only)
+- `.github/workflows/deploy.yml` — triggered by CI success; builds prod image → pushes to GHCR → SSH restarts stack
+
+**ci.yml jobs**
+- `lint` — ruff + black (host Python 3.11, no services)
+- `test` — pgvector + redis service containers; runs migrations → seed → `pytest tests/unit tests/integration` with coverage
+- `eval` (main/master only) — same services + ingest KB → `run_eval --limit 10`; uploads HTML report as artifact
+
+**deploy.yml**
+- Triggered via `workflow_run` on CI success (main/master)
+- Builds `Dockerfile target: production`, pushes to `ghcr.io/<owner>/<repo>:latest`
+- SSH into server: pulls image, restarts `api` + `worker` via `docker-compose.prod.yml`, health-checks `/healthz`
+
+**GitHub Secrets required**
+| Secret | Used by |
+|---|---|
+| `OPENAI_API_KEY` | eval job (real LLM calls) |
+| `DEPLOY_HOST` | deploy SSH target |
+| `DEPLOY_USER` | deploy SSH user |
+| `DEPLOY_SSH_KEY` | deploy SSH private key |
+| `GITHUB_TOKEN` | automatic — GHCR push + pull |
+
+**Server pre-requisites**
+- `~/resolveai/docker-compose.prod.yml` and `~/resolveai/.env` present
+- `RESOLVEAI_IMAGE` env var consumed by compose prod file to pin the pulled image
+
+---
+
+### KB Improvements (applied alongside Phase 12, not a separate phase)
 - Raised `_MAX_COSINE_DISTANCE` 0.72 → 0.82 in `app/services/rag/retriever.py`
   (cross-lingual Roman Urdu → English queries have slightly higher cosine distance)
 - Added 5 targeted English FAQ chunks via `scripts/add_faq_entries.py`:
