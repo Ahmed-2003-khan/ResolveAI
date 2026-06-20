@@ -94,8 +94,12 @@ class LLMRouter:
                 result = await provider.chat(messages, model_tier=model_tier, **kwargs)
                 circuit.record_success()
                 LLM_COST.labels(provider=name, model=result.model).inc(result.cost_usd)
-                LLM_TOKENS.labels(provider=name, model=result.model, direction="input").inc(result.input_tokens)
-                LLM_TOKENS.labels(provider=name, model=result.model, direction="output").inc(result.output_tokens)
+                LLM_TOKENS.labels(provider=name, model=result.model, direction="input").inc(
+                    result.input_tokens
+                )
+                LLM_TOKENS.labels(provider=name, model=result.model, direction="output").inc(
+                    result.output_tokens
+                )
                 log.info(
                     "llm_call_success",
                     provider=name,
@@ -130,9 +134,7 @@ class LLMRouter:
             name: {
                 "open": circuit.is_open(window, threshold),
                 "open_until_seconds": max(0.0, circuit.open_until - now),
-                "recent_failures": len(
-                    [t for t in circuit.failure_times if now - t < window]
-                ),
+                "recent_failures": len([t for t in circuit.failure_times if now - t < window]),
             }
             for name, circuit in self._circuits.items()
         }

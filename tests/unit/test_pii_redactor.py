@@ -1,4 +1,5 @@
 """Unit tests for app.services.pii — regex rules and PIIRedactor."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,7 +8,6 @@ import pytest
 
 from app.services.pii.redactor import PIIRedactor, RedactionResult
 from app.services.pii.regex_rules import COMPILED, PATTERNS
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -99,9 +99,7 @@ def test_iban_in_sentence(redactor: PIIRedactor) -> None:
 
 
 def test_iban_multiple(redactor: PIIRedactor) -> None:
-    result = redactor.redact(
-        "from PK36SCBL0000001123456702 to PK00HABB0000000012345678"
-    )
+    result = redactor.redact("from PK36SCBL0000001123456702 to PK00HABB0000000012345678")
     assert "<IBAN_1>" in result.redacted_text
     assert "<IBAN_2>" in result.redacted_text
 
@@ -244,6 +242,7 @@ def test_compiled_keys_match_patterns() -> None:
 
 def test_compiled_values_are_patterns() -> None:
     import re
+
     for name, pat in COMPILED.items():
         assert isinstance(pat, re.Pattern), f"{name} should be compiled"
 
@@ -266,9 +265,7 @@ async def test_redact_with_llm_happy_path(redactor: PIIRedactor) -> None:
 
 @pytest.mark.asyncio
 async def test_redact_with_llm_falls_back_on_error(redactor: PIIRedactor) -> None:
-    with patch.object(
-        redactor, "_call_ollama", side_effect=Exception("connection refused")
-    ):
+    with patch.object(redactor, "_call_ollama", side_effect=Exception("connection refused")):
         result = await redactor.redact_with_llm("phone 03001234567")
 
     assert "<MOBILE_1>" in result.redacted_text

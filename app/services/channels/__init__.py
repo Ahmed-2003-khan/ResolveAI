@@ -14,7 +14,7 @@ def get_channel_adapter(channel: str) -> ChannelAdapter:
     try:
         return _ADAPTERS[channel]
     except KeyError:
-        raise ValueError(f"Unknown channel: {channel!r}")
+        raise ValueError(f"Unknown channel: {channel!r}") from None
 
 
 __all__ = [

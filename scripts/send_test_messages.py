@@ -13,7 +13,9 @@ try:
     import websockets
 except ImportError:
     print("websockets not installed. Running: pip install websockets")
-    import subprocess, sys
+    import subprocess
+    import sys
+
     subprocess.run([sys.executable, "-m", "pip", "install", "websockets"], check=True)
     import websockets
 
@@ -51,19 +53,19 @@ async def send_one(msg: str, idx: int) -> None:
 
 
 async def main() -> None:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Sending test messages via WebSocket")
     print("  (API process metrics -> visible in Grafana)")
-    print("="*60)
+    print("=" * 60)
 
     for i, msg in enumerate(MESSAGES, 1):
         await send_one(msg, i)
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Done! Now check Grafana:")
     print("  http://localhost:3001/d/resolveai-v1")
     print("  (Set time range to 'Last 15 minutes')")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
 
 if __name__ == "__main__":

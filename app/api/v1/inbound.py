@@ -69,7 +69,7 @@ async def email_inbound(request: Request) -> Response:
     try:
         raw: dict = json.loads(body)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from None
 
     msg = await adapter.parse_inbound(raw)
 
@@ -115,6 +115,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str) -> None:
 
             # Persist outbound message + audit trail (same as ARQ worker path)
             from app.workers.tasks import _persist_outbound
+
             await _persist_outbound(result.get("conversation_id", ""), reply, result)
 
             await connection_manager.send_text(session_id, reply)
@@ -149,7 +150,9 @@ async def _enqueue(msg: InboundMessage) -> None:
         final_response = result.get("final_response") or ""
         if final_response:
             adapter = get_channel_adapter(msg.channel)
-            out = OutboundMessage(channel=msg.channel, to=msg.user_identifier, content=final_response)
+            out = OutboundMessage(
+                channel=msg.channel, to=msg.user_identifier, content=final_response
+            )
             await adapter.send(out)
 
 

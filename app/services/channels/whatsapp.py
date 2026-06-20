@@ -34,7 +34,7 @@ class WhatsAppAdapter(ChannelAdapter):
 
         # Parse form body into a plain dict for the validator
         try:
-            from urllib.parse import parse_qs, unquote_plus
+            from urllib.parse import unquote_plus
 
             params: dict[str, str] = {}
             for pair in body.decode().split("&"):

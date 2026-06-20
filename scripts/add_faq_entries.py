@@ -7,6 +7,7 @@ or missing content. English only — the multilingual embedding model
 Usage (inside Docker):
     docker compose exec -T api python -m scripts.add_faq_entries
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -83,17 +84,14 @@ async def main() -> None:
     embedder = get_embedder()
 
     # Build content strings (same format as chunker for faq source_type)
-    contents = [
-        f"Q: {q}\n\nA: {a}"
-        for _, _, q, a, _ in _FAQ_ENTRIES
-    ]
+    contents = [f"Q: {q}\n\nA: {a}" for _, _, q, a, _ in _FAQ_ENTRIES]
 
     log.info("embedding_faq_entries", count=len(contents))
     embeddings = await embedder.embed_batch(contents)
 
     async with async_session_factory() as session:
         for (source_id, title, _, _, product_area), content, embedding in zip(
-            _FAQ_ENTRIES, contents, embeddings
+            _FAQ_ENTRIES, contents, embeddings, strict=False
         ):
             # Check if already exists
             existing = await session.scalar(
@@ -126,4 +124,5 @@ async def main() -> None:
 
 if __name__ == "__main__":
     import app.core.logging  # noqa: F401
+
     asyncio.run(main())

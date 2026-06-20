@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -91,11 +91,11 @@ async def build_agent_state(msg: InboundMessage) -> dict[str, Any]:
             sender_type="user",
             content=msg.content,
             channel_msg_id=msg.channel_msg_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         session.add(db_msg)
 
-        conversation.last_activity = datetime.now(timezone.utc)
+        conversation.last_activity = datetime.now(UTC)
         await session.commit()
 
         user_profile = {
@@ -208,8 +208,8 @@ async def _get_or_create_conversation(session, user_id: uuid.UUID, channel: str)
             user_id=user_id,
             channel=channel,
             status="active",
-            started_at=datetime.now(timezone.utc),
-            last_activity=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
+            last_activity=datetime.now(UTC),
         )
         session.add(conv)
         await session.flush()
@@ -246,7 +246,7 @@ async def _persist_outbound(conversation_id: str, content: str, result: dict) ->
         res = await session.execute(stmt)
         conv = res.scalar_one_or_none()
         if conv:
-            conv.last_activity = datetime.now(timezone.utc)
+            conv.last_activity = datetime.now(UTC)
             # Explicit goodbye → immediately resolve; human escalation → escalated
             intent = result.get("intent", "")
             if intent == "session_end":
@@ -261,7 +261,7 @@ async def _persist_outbound(conversation_id: str, content: str, result: dict) ->
                 direction="outbound",
                 sender_type="agent",
                 content=content,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 metadata_={
                     "intent": result.get("intent"),
                     "tools_used": list(result.get("tool_results", {}).keys()),
@@ -299,7 +299,7 @@ async def _persist_outbound(conversation_id: str, content: str, result: dict) ->
                 latency_ms=entry.get("latency_ms"),
                 input_redacted=input_str,
                 output=output_str,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             session.add(audit)
 
@@ -317,7 +317,7 @@ async def auto_resolve_inactive_conversations(ctx: dict) -> None:
 
     Runs every 5 minutes via the ARQ cron schedule in arq_settings.py.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=INACTIVITY_MINUTES)
+    cutoff = datetime.now(UTC) - timedelta(minutes=INACTIVITY_MINUTES)
     async with async_session_factory() as session:
         stmt = (
             update(Conversation)

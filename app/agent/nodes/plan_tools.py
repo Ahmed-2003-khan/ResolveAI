@@ -7,8 +7,8 @@ import re
 import time
 from pathlib import Path
 
-import yaml
 import structlog
+import yaml
 
 from app.agent.state import AgentState
 from app.observability.metrics import NODE_DURATION
@@ -39,7 +39,7 @@ def _filter_tools(tool_schemas: list[dict], state: AgentState) -> list[dict]:
     Specifically: hide get_order_status when no order ID is present in the
     message.  This prevents the LLM from hallucinating an order ID.
     """
-    message = (state.get("cleaned_content") or state.get("user_message") or "")
+    message = state.get("cleaned_content") or state.get("user_message") or ""
     has_order_id = bool(_ORDER_ID_RE.search(message))
     if has_order_id:
         return tool_schemas

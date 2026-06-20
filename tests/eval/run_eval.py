@@ -23,11 +23,10 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
-from sqlalchemy import text
 
 log = structlog.get_logger(__name__)
 
@@ -58,6 +57,7 @@ def _get_git_sha() -> str:
 
 
 # ── Agent runner ──────────────────────────────────────────────────────────────
+
 
 async def _run_case(case: dict, graph) -> dict:
     """Invoke the agent graph for one eval case.  Returns a raw result dict."""
@@ -94,6 +94,7 @@ async def _run_case(case: dict, graph) -> dict:
 
 # ── DB persistence ────────────────────────────────────────────────────────────
 
+
 async def _save_to_db(
     run_id: uuid.UUID,
     git_sha: str,
@@ -107,7 +108,7 @@ async def _save_to_db(
         run = EvalRun(
             id=run_id,
             git_sha=git_sha,
-            run_at=datetime.now(timezone.utc),
+            run_at=datetime.now(UTC),
             total_cases=metrics.total_cases,
             passed=metrics.passed,
             failed=metrics.failed,
@@ -148,6 +149,7 @@ async def _save_to_db(
 
 # ── HTML report ───────────────────────────────────────────────────────────────
 
+
 def _status_badge(passed: bool) -> str:
     if passed:
         return '<span class="badge pass">PASS</span>'
@@ -161,16 +163,22 @@ def _score_cell(val: float | None) -> str:
     return f'<td style="color:{colour};font-weight:600">{val:.2f}</td>'
 
 
-def _generate_html(results: list[dict], metrics, run_id: str, git_sha: str, report_path: Path) -> None:
+def _generate_html(
+    results: list[dict], metrics, run_id: str, git_sha: str, report_path: Path
+) -> None:
     rows_html = []
     for r in results:
         j = r.get("judge_scores") or {}
         failures = r.get("failures", [])
         fail_html = (
-            '<ul style="margin:0;padding-left:1rem;font-size:0.8rem;color:#b00">'
-            + "".join(f"<li>{f}</li>" for f in failures)
-            + "</ul>"
-        ) if failures else ""
+            (
+                '<ul style="margin:0;padding-left:1rem;font-size:0.8rem;color:#b00">'
+                + "".join(f"<li>{f}</li>" for f in failures)
+                + "</ul>"
+            )
+            if failures
+            else ""
+        )
         rows_html.append(f"""
         <tr>
             <td>{r.get('case_id','')}</td>
@@ -188,7 +196,11 @@ def _generate_html(results: list[dict], metrics, run_id: str, git_sha: str, repo
     # Category table
     cat_rows = []
     for cat, stats in sorted(metrics.by_category.items()):
-        colour = "green" if stats["pass_rate"] >= 0.85 else ("orange" if stats["pass_rate"] >= 0.6 else "red")
+        colour = (
+            "green"
+            if stats["pass_rate"] >= 0.85
+            else ("orange" if stats["pass_rate"] >= 0.6 else "red")
+        )
         cat_rows.append(f"""
         <tr>
             <td>{cat}</td>
@@ -235,7 +247,7 @@ def _generate_html(results: list[dict], metrics, run_id: str, git_sha: str, repo
 <body>
 <div class="header">
   <h1>ResolveAI Eval Report</h1>
-  <div class="meta">Run ID: {run_id} &nbsp;|&nbsp; Git SHA: {git_sha} &nbsp;|&nbsp; {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</div>
+  <div class="meta">Run ID: {run_id} &nbsp;|&nbsp; Git SHA: {git_sha} &nbsp;|&nbsp; {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}</div>
 </div>
 <div class="container">
 
@@ -316,9 +328,11 @@ def _generate_html(results: list[dict], metrics, run_id: str, git_sha: str, repo
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def _patch_router_for_groq() -> None:
     """Force the LLM router to try Groq before OpenAI for eval runs."""
     import app.services.llm.router as _router_mod
+
     _router_mod._TIER_PROVIDERS["cheap"] = ["groq", "openai", "ollama"]
     _router_mod._TIER_PROVIDERS["smart"] = ["groq", "openai"]
     # Reset singleton so it picks up the new order
@@ -327,10 +341,11 @@ def _patch_router_for_groq() -> None:
 
 
 async def main(args: argparse.Namespace) -> int:
-    from app.agent.graph import build_graph
     from langgraph.checkpoint.memory import MemorySaver
+
+    from app.agent.graph import build_graph
     from tests.eval.llm_judge import get_judge
-    from tests.eval.metrics import check_assertions, compute_aggregate, check_thresholds
+    from tests.eval.metrics import check_assertions, check_thresholds, compute_aggregate
 
     # Note: --groq only affects the judge. Agent always uses OpenAI→Groq→Ollama
     # because llama-3.1-8b-instant is unreliable at function/tool calling.
@@ -339,13 +354,20 @@ async def main(args: argparse.Namespace) -> int:
     log.info("eval_warmup_start")
     try:
         from app.services.rag.reranker import get_reranker
+
         reranker = get_reranker()
         await reranker.rerank("test query", [{"content": "warmup", "id": "warmup"}])
         log.info("eval_warmup_done")
     except Exception as exc:
         log.warning("eval_warmup_failed", error=str(exc))
 
-    log.info("eval_start", golden_set=str(_GOLDEN_SET), limit=args.limit, offset=args.offset, cases=args.cases)
+    log.info(
+        "eval_start",
+        golden_set=str(_GOLDEN_SET),
+        limit=args.limit,
+        offset=args.offset,
+        cases=args.cases,
+    )
 
     cases = _load_golden_set(_GOLDEN_SET, limit=args.limit, offset=args.offset)
     if args.cases:
@@ -383,7 +405,7 @@ async def main(args: argparse.Namespace) -> int:
             tool_results = raw.get("tool_results") or {}
             tools_called = list(tool_results.keys())
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             run_error = "timeout after 60s"
             log.warning("eval_case_timeout", case_id=case_id)
         except Exception as exc:
@@ -397,12 +419,20 @@ async def main(args: argparse.Namespace) -> int:
         judge_scores: dict | None = None
         if judge and actual_response and not run_error:
             scores = await judge.judge(
-                case, actual_response, retrieved_chunks,
+                case,
+                actual_response,
+                retrieved_chunks,
                 tool_results=raw.get("tool_results") or None,
             )
             judge_scores = scores.to_dict()
         elif run_error:
-            judge_scores = {"groundedness": 0.0, "helpfulness": 0.0, "policy_score": 0.0, "reasoning": run_error, "error": run_error}
+            judge_scores = {
+                "groundedness": 0.0,
+                "helpfulness": 0.0,
+                "policy_score": 0.0,
+                "reasoning": run_error,
+                "error": run_error,
+            }
 
         result = {
             "case_id": case_id,
@@ -471,7 +501,7 @@ async def main(args: argparse.Namespace) -> int:
 
     # Print summary to stdout
     print(f"\n{'='*60}")
-    print(f"  ResolveAI Eval Results")
+    print("  ResolveAI Eval Results")
     print(f"{'='*60}")
     print(f"  Cases:         {metrics.total_cases}")
     print(f"  Passed:        {metrics.passed}  ({metrics.pass_rate:.1%})")
@@ -499,10 +529,19 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ResolveAI eval harness")
     parser.add_argument("--limit", type=int, default=None, help="Run only first N cases")
     parser.add_argument("--offset", type=int, default=0, help="Skip first N cases (for batching)")
-    parser.add_argument("--cases", type=str, default=None, help="Comma-separated list of case_ids to run (e.g. tkt_002,ref_009)")
+    parser.add_argument(
+        "--cases",
+        type=str,
+        default=None,
+        help="Comma-separated list of case_ids to run (e.g. tkt_002,ref_009)",
+    )
     parser.add_argument("--no-db", action="store_true", help="Skip DB persistence")
-    parser.add_argument("--no-judge", action="store_true", help="Skip LLM judge (faster, no rubric scores)")
-    parser.add_argument("--groq", action="store_true", help="Force Groq for agent + judge (faster, cheaper)")
+    parser.add_argument(
+        "--no-judge", action="store_true", help="Skip LLM judge (faster, no rubric scores)"
+    )
+    parser.add_argument(
+        "--groq", action="store_true", help="Force Groq for agent + judge (faster, cheaper)"
+    )
     parser.add_argument("--html", type=str, default=None, help="Path for HTML report")
     return parser.parse_args()
 

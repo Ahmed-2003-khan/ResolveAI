@@ -7,14 +7,9 @@ The mock CRM singleton is reset between tests via a fresh MockCRMService instanc
 import pytest
 
 from app.services.mock_crm.crm_service import MockCRMService
-from app.services.tools.account import GetAccountBalanceTool, GetRecentTransactionsTool
 from app.services.tools.base import Tool
-from app.services.tools.escalation import EscalateToHumanTool
 from app.services.tools.order import GetOrderStatusTool
-from app.services.tools.refund import CreateRefundRequestTool
 from app.services.tools.registry import ToolRegistry
-from app.services.tools.ticket import CreateSupportTicketTool
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -315,12 +310,8 @@ async def test_escalate_to_human_success(registry: ToolRegistry) -> None:
 
 @pytest.mark.asyncio
 async def test_escalate_position_increments(registry: ToolRegistry) -> None:
-    r1 = await registry.execute(
-        "escalate_to_human", conversation_id="conv-1", reason="reason"
-    )
-    r2 = await registry.execute(
-        "escalate_to_human", conversation_id="conv-2", reason="reason"
-    )
+    r1 = await registry.execute("escalate_to_human", conversation_id="conv-1", reason="reason")
+    r2 = await registry.execute("escalate_to_human", conversation_id="conv-2", reason="reason")
     assert r2["position"] == r1["position"] + 1
 
 

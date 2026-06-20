@@ -3,6 +3,7 @@
 Usage (inside Docker):
     docker compose exec -T api python -m scripts.show_chunks
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -14,8 +15,8 @@ _KB_PRIMARY = {"kb_faq", "general_inquiry"}
 
 
 async def main() -> None:
-    from app.services.rag.retriever import get_retriever
     from app.services.rag.reranker import get_reranker
+    from app.services.rag.retriever import get_retriever
 
     cases = []
     with _GOLDEN.open(encoding="utf-8") as fh:
@@ -54,4 +55,5 @@ async def main() -> None:
 
 if __name__ == "__main__":
     import app.core.logging  # noqa: F401
+
     asyncio.run(main())

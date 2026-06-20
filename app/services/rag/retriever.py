@@ -44,9 +44,7 @@ def _build_or_tsquery(query: str) -> str:
     return " | ".join(unique)
 
 
-def _reciprocal_rank_fusion(
-    dense: list[dict], bm25: list[dict], k: int = _RRF_K
-) -> list[dict]:
+def _reciprocal_rank_fusion(dense: list[dict], bm25: list[dict], k: int = _RRF_K) -> list[dict]:
     """Merge two ranked lists using Reciprocal Rank Fusion."""
     scores: dict[str, dict] = {}
     for rank, doc in enumerate(dense):
@@ -65,9 +63,7 @@ def _reciprocal_rank_fusion(
 class Retriever:
     """Hybrid dense + BM25 retriever with RRF fusion and BGE reranking."""
 
-    async def retrieve(
-        self, query: str, filters: dict | None = None, k: int = 5
-    ) -> list[dict]:
+    async def retrieve(self, query: str, filters: dict | None = None, k: int = 5) -> list[dict]:
         """Return the top-k most relevant chunks for *query*.
 
         Returns an empty list on any error so callers are never blocked by
@@ -109,29 +105,25 @@ class Retriever:
         area_filter = "AND product_area = :product_area" if product_area else ""
 
         # Dense: drop clearly off-topic chunks via a coarse distance cutoff.
-        dense_sql = text(
-            f"""
+        dense_sql = text(f"""
             SELECT id, source_id, source_type, title, content, product_area
             FROM kb_chunks
             WHERE (embedding <=> CAST(:vec AS vector)) < :max_dist {area_filter}
             ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT :limit
-            """
-        )
+            """)
 
         # BM25: OR the lexemes against the language-agnostic `simple` tsvector
         # so Roman-Urdu terms survive (no English stemming / stopword removal).
         or_query = _build_or_tsquery(query)
-        bm25_sql = text(
-            f"""
+        bm25_sql = text(f"""
             SELECT id, source_id, source_type, title, content, product_area
             FROM kb_chunks
             WHERE content_tsv_simple @@ to_tsquery('simple', :tsq)
               {area_filter}
             ORDER BY ts_rank(content_tsv_simple, to_tsquery('simple', :tsq)) DESC
             LIMIT :limit
-            """
-        )
+            """)
 
         dense_params: dict = {
             "vec": vec_str,
@@ -144,15 +136,11 @@ class Retriever:
             bm25_params["product_area"] = product_area
 
         async with async_session_factory() as session:
-            dense_rows = (
-                await session.execute(dense_sql, dense_params)
-            ).mappings().all()
+            dense_rows = (await session.execute(dense_sql, dense_params)).mappings().all()
 
             # An empty token set produces an invalid tsquery — skip BM25 then.
             if or_query:
-                bm25_rows = (
-                    await session.execute(bm25_sql, bm25_params)
-                ).mappings().all()
+                bm25_rows = (await session.execute(bm25_sql, bm25_params)).mappings().all()
             else:
                 bm25_rows = []
 

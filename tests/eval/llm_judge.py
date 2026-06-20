@@ -10,11 +10,15 @@ from __future__ import annotations
 
 import json
 import re
+from typing import TYPE_CHECKING
+
 import structlog
 
-from app.config import get_settings
 from app.services.llm.base import ChatMessage
 from app.services.llm.router import get_llm_router
+
+if TYPE_CHECKING:
+    from app.services.llm.groq_provider import GroqProvider
 
 log = structlog.get_logger(__name__)
 
@@ -115,7 +119,7 @@ class JudgeScores:
         }
 
     @classmethod
-    def error_fallback(cls, msg: str) -> "JudgeScores":
+    def error_fallback(cls, msg: str) -> JudgeScores:
         return cls(0.5, 0.5, 0.5, reasoning="", error=msg)
 
 
@@ -126,11 +130,12 @@ class LLMJudge:
         # use_groq kept for backwards compat but defaults False — Groq llama-3.1-8b
         # returns inconsistent JSON scores; gpt-4o-mini is far more reliable here.
         self._use_groq = use_groq
-        self._groq: "GroqProvider | None" = None
+        self._groq: GroqProvider | None = None
 
     def _get_groq(self):
         if self._groq is None:
             from app.services.llm.groq_provider import GroqProvider
+
             self._groq = GroqProvider()
         return self._groq
 
@@ -187,7 +192,9 @@ class LLMJudge:
             )
 
         except json.JSONDecodeError as exc:
-            log.warning("judge_json_parse_error", error=str(exc), raw=raw[:200] if "raw" in dir() else "")
+            log.warning(
+                "judge_json_parse_error", error=str(exc), raw=raw[:200] if "raw" in dir() else ""
+            )
             return JudgeScores.error_fallback(f"json_parse_error: {exc}")
 
         except Exception as exc:

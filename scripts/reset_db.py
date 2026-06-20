@@ -6,6 +6,7 @@ recreates it, then runs `alembic upgrade head` to rebuild from scratch.
 Usage:
     python scripts/reset_db.py
 """
+
 import asyncio
 import subprocess
 import sys

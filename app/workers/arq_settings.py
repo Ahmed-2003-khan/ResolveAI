@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import structlog
 from arq.connections import RedisSettings
-
 from arq.cron import cron
 
 from app.config import get_settings
@@ -20,11 +19,11 @@ async def startup(ctx: dict) -> None:
     setup_logging()
     # Pre-warm the reranker so its model is loaded before the first job arrives.
     # Without this the first job always times out while the model downloads.
-    import asyncio
 
     log.info("arq_worker_prewarm_reranker_start")
     try:
         from app.services.rag.reranker import get_reranker
+
         reranker = get_reranker()
         # Triggers _load() + one predict pass so the model is hot for real jobs
         await reranker.rerank("warmup", [{"content": "warmup"}], k=1)
@@ -45,7 +44,10 @@ class WorkerSettings:
     functions = [process_inbound_message]
     cron_jobs = [
         # Resolve conversations with no activity for 30+ minutes — runs every 5 min
-        cron(auto_resolve_inactive_conversations, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}),
+        cron(
+            auto_resolve_inactive_conversations,
+            minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55},
+        ),
     ]
     redis_settings = RedisSettings.from_dsn(_settings.redis_url)
     on_startup = startup

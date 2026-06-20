@@ -31,7 +31,9 @@ class EvalResult(Base):
     __tablename__ = "eval_results"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("eval_runs.id"), nullable=False)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("eval_runs.id"), nullable=False
+    )
     case_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     actual_response: Mapped[str | None] = mapped_column(Text, nullable=True)

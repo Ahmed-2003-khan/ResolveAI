@@ -73,9 +73,7 @@ class GetAccountBalanceTool(Tool):
             balance=account.balance_pkr,
             currency=account.currency,
             last_txn=(
-                account.last_transaction_at.isoformat()
-                if account.last_transaction_at
-                else None
+                account.last_transaction_at.isoformat() if account.last_transaction_at else None
             ),
             account_status=account.status,
         )

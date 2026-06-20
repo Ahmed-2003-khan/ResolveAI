@@ -1,18 +1,19 @@
 """Unit tests for LLMRouter: fallback order, circuit breaker, tier routing."""
 
+import contextlib
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.core.exceptions import AllProvidersDownError
-from app.services.llm.base import ChatMessage, ChatResult, ModelTier
-from app.services.llm.router import LLMRouter, _CircuitState, _TIER_PROVIDERS
-
+from app.services.llm.base import ChatMessage, ChatResult
+from app.services.llm.router import _TIER_PROVIDERS, LLMRouter, _CircuitState
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_result(provider: str = "openai", model: str = "gpt-4o-mini") -> ChatResult:
     return ChatResult(
@@ -47,6 +48,7 @@ def _make_router(openai_mock=None, groq_mock=None, ollama_mock=None) -> LLMRoute
 # ---------------------------------------------------------------------------
 # Basic routing
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_first_provider_succeeds_returns_immediately():
@@ -113,6 +115,7 @@ async def test_raises_all_providers_down_when_all_fail():
 # Tier routing — smart tier must never reach Ollama
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_smart_tier_does_not_use_ollama():
     openai = AsyncMock()
@@ -156,6 +159,7 @@ def test_cheap_tier_provider_list_includes_ollama():
 # ---------------------------------------------------------------------------
 # Circuit breaker
 # ---------------------------------------------------------------------------
+
 
 class TestCircuitState:
     def test_initially_closed(self):
@@ -233,10 +237,8 @@ async def test_consecutive_failures_trip_circuit_and_skip_on_next_call():
     with patch("app.services.llm.router.get_settings", return_value=settings_patch):
         # First 3 calls trigger failures → circuit opens.
         for _ in range(3):
-            try:
+            with contextlib.suppress(Exception):
                 await router.chat(_messages(), model_tier="cheap")
-            except Exception:
-                pass
 
         openai.chat.reset_mock()
         groq.chat.reset_mock()
@@ -251,6 +253,7 @@ async def test_consecutive_failures_trip_circuit_and_skip_on_next_call():
 # ---------------------------------------------------------------------------
 # circuit_status helper
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_circuit_status_all_closed_initially():

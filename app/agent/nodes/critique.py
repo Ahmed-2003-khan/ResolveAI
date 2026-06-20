@@ -6,8 +6,8 @@ import json
 import time
 from pathlib import Path
 
-import yaml
 import structlog
+import yaml
 
 from app.agent.state import AgentState
 from app.observability.metrics import CRITIQUE_SCORE, NODE_DURATION

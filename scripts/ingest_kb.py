@@ -10,6 +10,7 @@ Reads:
 Each record is chunked, embedded (OpenAI text-embedding-3-small), and
 inserted into the kb_chunks table with a tsvector computed server-side.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -20,7 +21,6 @@ from pathlib import Path
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.db import async_session_factory
 from app.models.kb_chunk import KBChunk
@@ -105,7 +105,7 @@ def _build_rows(records: list[dict]) -> list[dict]:
 
 
 async def _insert_batch(session, rows: list[dict], embeddings: list[list[float]]) -> None:
-    for row, emb in zip(rows, embeddings):
+    for row, emb in zip(rows, embeddings, strict=False):
         chunk_id = uuid.uuid4()
         tsv = await session.scalar(
             text("SELECT to_tsvector('english', :t)"),

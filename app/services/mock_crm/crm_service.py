@@ -6,7 +6,7 @@ without touching the seed rows so tests stay reproducible.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -16,7 +16,7 @@ log = structlog.get_logger(__name__)
 
 # ── Timezone-aware "now" for seed offsets ──────────────────────────────────────
 
-_EPOCH = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+_EPOCH = datetime(2026, 5, 30, 12, 0, 0, tzinfo=UTC)
 
 
 def _dt(days: int = 0, hours: int = 0) -> datetime:
@@ -337,9 +337,7 @@ class MockCRMService:
     async def get_account(self, user_id: str) -> Account | None:
         return self._accounts.get(user_id)
 
-    async def get_transactions(
-        self, user_id: str, limit: int = 5
-    ) -> list[Transaction]:
+    async def get_transactions(self, user_id: str, limit: int = 5) -> list[Transaction]:
         txns = self._transactions.get(user_id, [])
         return txns[:limit]
 
@@ -359,7 +357,7 @@ class MockCRMService:
             user_id=user_id,
             reason=reason,
             amount_pkr=amount_pkr,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._refunds[req.request_id] = req
         log.info("crm_refund_created", request_id=req.request_id, order_id=order_id)
@@ -376,7 +374,7 @@ class MockCRMService:
             user_id=user_id,
             summary=summary,
             priority=priority,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._tickets[ticket.ticket_id] = ticket
         log.info("crm_ticket_created", ticket_id=ticket.ticket_id, user_id=user_id)
@@ -393,7 +391,7 @@ class MockCRMService:
             conversation_id=conversation_id,
             reason=reason,
             position=position,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._escalations.append(entry)
         log.info(

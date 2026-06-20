@@ -5,8 +5,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import yaml
 import structlog
+import yaml
 
 from app.agent.state import AgentState
 from app.observability.metrics import NODE_DURATION

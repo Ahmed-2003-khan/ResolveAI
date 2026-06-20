@@ -10,7 +10,7 @@ Workflow:
 from __future__ import annotations
 
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 
 import structlog
@@ -65,21 +65,21 @@ class SemanticCacheService:
         dist_threshold = 1.0 - self._threshold
         vec_str = self._vec_str(q_vec)
 
-        sql = text(
-            """
+        sql = text("""
             SELECT id, response, (query_embedding <=> CAST(:vec AS vector)) AS distance
             FROM semantic_cache
             WHERE expires_at > now()
               AND (query_embedding <=> CAST(:vec AS vector)) <= :dist_thresh
             ORDER BY distance
             LIMIT 1
-            """
-        )
+            """)
         try:
             async with async_session_factory() as session:
                 row = (
-                    await session.execute(sql, {"vec": vec_str, "dist_thresh": dist_threshold})
-                ).mappings().first()
+                    (await session.execute(sql, {"vec": vec_str, "dist_thresh": dist_threshold}))
+                    .mappings()
+                    .first()
+                )
 
                 if row is None:
                     return None
@@ -110,17 +110,15 @@ class SemanticCacheService:
             return
 
         vec_str = self._vec_str(q_vec)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = now + timedelta(hours=self._ttl_hours)
 
-        sql = text(
-            """
+        sql = text("""
             INSERT INTO semantic_cache
                 (id, query_normalized, query_embedding, response, created_at, expires_at)
             VALUES
                 (gen_random_uuid(), :query, CAST(:vec AS vector), :response, :created_at, :expires_at)
-            """
-        )
+            """)
         try:
             async with async_session_factory() as session:
                 await session.execute(

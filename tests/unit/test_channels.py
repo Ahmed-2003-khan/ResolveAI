@@ -12,7 +12,6 @@ from app.services.channels.email import EmailAdapter
 from app.services.channels.web import WebAdapter
 from app.services.channels.whatsapp import WhatsAppAdapter
 
-
 # ── Schema tests ─────────────────────────────────────────────────────────────
 
 
@@ -40,7 +39,7 @@ def test_outbound_message_schema():
 
 
 def test_inbound_message_invalid_channel():
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         InboundMessage(
             channel="telegram",  # not in Literal
             channel_msg_id="x",

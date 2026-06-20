@@ -29,9 +29,7 @@ class PIIRedactor:
         for pii_type, pattern in COMPILED.items():
             count: list[int] = [0]
 
-            def _make_replacer(
-                ptype: str, cnt: list[int]
-            ) -> Callable[[re.Match[str]], str]:
+            def _make_replacer(ptype: str, cnt: list[int]) -> Callable[[re.Match[str]], str]:
                 def replacer(match: re.Match[str]) -> str:
                     cnt[0] += 1
                     placeholder = f"<{ptype}_{cnt[0]}>"
@@ -51,9 +49,7 @@ class PIIRedactor:
             result = result.replace(placeholder, original)
         return result
 
-    async def _call_ollama(
-        self, prompt: str, base_url: str, model: str
-    ) -> str:
+    async def _call_ollama(self, prompt: str, base_url: str, model: str) -> str:
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
                 f"{base_url}/api/generate",

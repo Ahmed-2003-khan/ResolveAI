@@ -12,15 +12,17 @@ Usage:
 """
 
 import asyncio
-import time
 import textwrap
+import time
 
 from app.agent.graph import run_with_cache
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+
 def _divider(char="-", width=62):
     print(char * width)
+
 
 def _header(title: str):
     print()
@@ -28,11 +30,13 @@ def _header(title: str):
     print(f"  {title}")
     _divider("=")
 
+
 def _section(title: str):
     print()
     _divider()
     print(f"  {title}")
     _divider()
+
 
 def _print_result(result: dict, elapsed_sec: float):
     audit = result.get("audit_trail") or []
@@ -63,9 +67,9 @@ def _print_result(result: dict, elapsed_sec: float):
         print("  NODE-BY-NODE AUDIT TRAIL:")
         _divider()
         for entry in audit:
-            node     = entry.get("node", "?")
-            lat      = entry.get("latency_ms", 0)
-            cost     = entry.get("cost_usd")
+            node = entry.get("node", "?")
+            lat = entry.get("latency_ms", 0)
+            cost = entry.get("cost_usd")
             cost_str = f"  ${cost:.6f}" if cost is not None else "          "
 
             note = ""
@@ -117,6 +121,7 @@ def _make_state(message: str, conv_id: str) -> dict:
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
+
 async def main():
     _header("ResolveAI — Semantic Cache Live Demo")
 
@@ -124,7 +129,7 @@ async def main():
     msg_original = "mera order ORD-001 kahan hai? 3 din ho gaye hain"
 
     _section("CALL 1 of 3 — Nayi query (pehli baar — cache empty hai)")
-    print(f"\n  Message: \"{msg_original}\"")
+    print(f'\n  Message: "{msg_original}"')
     print("\n  Cache mein kuch nahi hai abhi — full pipeline chalega...\n")
 
     t0 = time.perf_counter()
@@ -135,7 +140,7 @@ async def main():
 
     # ── Call 2: Exactly same query ────────────────────────────────────────
     _section("CALL 2 of 3 — Exactly same query (cache warm hai)")
-    print(f"\n  Message: \"{msg_original}\"")
+    print(f'\n  Message: "{msg_original}"')
     print("\n  Cache mein same message store ho gaya tha — seedha jawab milega...\n")
 
     t0 = time.perf_counter()
@@ -148,7 +153,7 @@ async def main():
     msg_similar = "yaar mujhe batao ORD-001 ka kya hua? deliver hua ya nahi?"
 
     _section("CALL 3 of 3 — Similar sawaal, alag alfaaz (semantic match test)")
-    print(f"\n  Message: \"{msg_similar}\"")
+    print(f'\n  Message: "{msg_similar}"')
     print("\n  Alag words hain lekin meaning same hai — cache hit hona chahiye...\n")
 
     t0 = time.perf_counter()
@@ -169,16 +174,24 @@ async def main():
     """)
 
     speedup = elapsed1 / elapsed2 if elapsed2 > 0 else 0
-    saved   = result1.get("total_cost_usd", 0) - result2.get("total_cost_usd", 0)
+    saved = result1.get("total_cost_usd", 0) - result2.get("total_cost_usd", 0)
     print(f"  Cache ne Call #2 ko {speedup:.1f}x tez kiya  |  ${saved:.6f} bachaye")
 
     # DB se verify karo ke row actually store hua
     from sqlalchemy import text
+
     from app.core.db import async_session_factory
+
     async with async_session_factory() as session:
         row = (
-            await session.execute(text("SELECT query_normalized, hit_count FROM semantic_cache LIMIT 5"))
-        ).mappings().all()
+            (
+                await session.execute(
+                    text("SELECT query_normalized, hit_count FROM semantic_cache LIMIT 5")
+                )
+            )
+            .mappings()
+            .all()
+        )
 
     print()
     _divider()

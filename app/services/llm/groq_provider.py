@@ -2,7 +2,7 @@ import time
 from typing import Any
 
 import structlog
-from groq import AsyncGroq, APITimeoutError, RateLimitError
+from groq import APITimeoutError, AsyncGroq, RateLimitError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
@@ -54,7 +54,9 @@ class GroqProvider(LLMProvider):
         out_tok = usage.completion_tokens if usage else 0
         rates = _COST_TABLE[model]
         cost = in_tok * rates["input"] + out_tok * rates["output"]
-        log.debug("groq_chat_ok", model=model, in_tok=in_tok, out_tok=out_tok, latency_ms=latency_ms)
+        log.debug(
+            "groq_chat_ok", model=model, in_tok=in_tok, out_tok=out_tok, latency_ms=latency_ms
+        )
         return ChatResult(
             content=response.choices[0].message.content or "",
             model=model,

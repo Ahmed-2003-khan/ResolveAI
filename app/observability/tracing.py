@@ -1,4 +1,5 @@
 """Tracing utilities — git SHA lookup and other cross-cutting helpers."""
+
 from __future__ import annotations
 
 import subprocess

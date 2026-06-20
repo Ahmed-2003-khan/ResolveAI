@@ -46,9 +46,9 @@ async def escalate(state: AgentState) -> dict:
         }
 
     reason = (
-        "abuse" if intent == "abuse"
-        else "explicit_request" if intent == "escalate_human"
-        else "low_critique_score"
+        "abuse"
+        if intent == "abuse"
+        else "explicit_request" if intent == "escalate_human" else "low_critique_score"
     )
 
     latency = int((time.monotonic() - t0) * 1000)

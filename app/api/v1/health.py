@@ -29,8 +29,9 @@ async def readyz() -> ReadyResponse:
     redis_ok = False
 
     try:
-        from app.core.db import engine
         from sqlalchemy import text
+
+        from app.core.db import engine
 
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))

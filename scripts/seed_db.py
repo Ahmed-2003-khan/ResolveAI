@@ -5,6 +5,7 @@ Usage:
 
 Upserts on phone column so repeated runs are idempotent.
 """
+
 from __future__ import annotations
 
 import asyncio

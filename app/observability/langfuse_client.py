@@ -7,11 +7,13 @@ Usage in graph.py:
 When LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY are not set the wrappers are
 transparent no-ops, so observability never breaks the application.
 """
+
 from __future__ import annotations
 
 import functools
 import subprocess
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import structlog
 

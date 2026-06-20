@@ -46,7 +46,9 @@ async def execute_tools(state: AgentState) -> dict:
                 "node": "execute_tools",
                 "tools_executed": list(tool_results.keys()),
                 "latency_ms": latency,
-                "output": {k: "ok" if "error" not in v else "error" for k, v in tool_results.items()},
+                "output": {
+                    k: "ok" if "error" not in v else "error" for k, v in tool_results.items()
+                },
             }
         ],
     }

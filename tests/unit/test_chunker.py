@@ -1,7 +1,6 @@
 """Unit tests for app.services.rag.chunker."""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from app.services.rag.chunker import (
     ChunkResult,
@@ -18,6 +17,7 @@ _OVERLAP_CHARS = 256
 # ---------------------------------------------------------------------------
 # _split_paragraphs
 # ---------------------------------------------------------------------------
+
 
 def test_split_paragraphs_basic():
     text = "First paragraph.\n\nSecond paragraph.\n\nThird."
@@ -48,6 +48,7 @@ def test_split_paragraphs_empty_string():
 # _split_words
 # ---------------------------------------------------------------------------
 
+
 def test_split_words_respects_max_chars():
     long_text = " ".join(["word"] * 200)  # ~900 chars
     chunks = _split_words(long_text, 100)
@@ -73,6 +74,7 @@ def test_split_words_single_word_larger_than_max():
 # ---------------------------------------------------------------------------
 # chunk_article
 # ---------------------------------------------------------------------------
+
 
 def test_chunk_article_short_text_single_chunk():
     text = "Short article.\n\nStill short."
@@ -134,8 +136,11 @@ def test_chunk_article_preserves_all_content():
 # chunk_document — ticket / faq dispatch
 # ---------------------------------------------------------------------------
 
+
 def test_chunk_document_ticket_single_chunk():
-    results = chunk_document("", "ticket", question="Where is my order?", answer="It is on the way.")
+    results = chunk_document(
+        "", "ticket", question="Where is my order?", answer="It is on the way."
+    )
     assert len(results) == 1
     r = results[0]
     assert isinstance(r, ChunkResult)
@@ -166,6 +171,7 @@ def test_chunk_document_ticket_no_question_no_answer():
 # ---------------------------------------------------------------------------
 # chunk_document — article / policy dispatch
 # ---------------------------------------------------------------------------
+
 
 def test_chunk_document_article_returns_chunk_results():
     content = "paragraph one\n\n" * 50  # medium-length article

@@ -16,7 +16,9 @@ class AssertionResult:
     failures: list[str] = field(default_factory=list)
 
 
-def check_assertions(case: dict[str, Any], final_response: str, actual_intent: str, tools_called: list[str]) -> AssertionResult:
+def check_assertions(
+    case: dict[str, Any], final_response: str, actual_intent: str, tools_called: list[str]
+) -> AssertionResult:
     """Run deterministic assertions against a single eval case result."""
     failures: list[str] = []
     response_lower = final_response.lower()
@@ -84,13 +86,27 @@ def compute_aggregate(results: list[dict[str, Any]]) -> AggregateMetrics:
     passed_count = sum(1 for r in results if r.get("passed", False))
     failed_count = total - passed_count
 
-    groundedness_vals = [r["judge_scores"]["groundedness"] for r in results if r.get("judge_scores") and r["judge_scores"].get("groundedness") is not None]
-    helpfulness_vals = [r["judge_scores"]["helpfulness"] for r in results if r.get("judge_scores") and r["judge_scores"].get("helpfulness") is not None]
-    policy_vals = [r["judge_scores"]["policy_score"] for r in results if r.get("judge_scores") and r["judge_scores"].get("policy_score") is not None]
+    groundedness_vals = [
+        r["judge_scores"]["groundedness"]
+        for r in results
+        if r.get("judge_scores") and r["judge_scores"].get("groundedness") is not None
+    ]
+    helpfulness_vals = [
+        r["judge_scores"]["helpfulness"]
+        for r in results
+        if r.get("judge_scores") and r["judge_scores"].get("helpfulness") is not None
+    ]
+    policy_vals = [
+        r["judge_scores"]["policy_score"]
+        for r in results
+        if r.get("judge_scores") and r["judge_scores"].get("policy_score") is not None
+    ]
 
     intent_accuracy = sum(1 for r in results if r.get("intent_match", False)) / total
     tool_accuracy_vals = [r for r in results if r.get("expected_tools") is not None]
-    tool_accuracy = sum(1 for r in tool_accuracy_vals if r.get("tools_match", False)) / max(len(tool_accuracy_vals), 1)
+    tool_accuracy = sum(1 for r in tool_accuracy_vals if r.get("tools_match", False)) / max(
+        len(tool_accuracy_vals), 1
+    )
 
     latencies = [r["latency_ms"] for r in results if r.get("latency_ms") is not None]
 
@@ -103,7 +119,7 @@ def compute_aggregate(results: list[dict[str, Any]]) -> AggregateMetrics:
         by_category[cat]["total"] += 1
         if r.get("passed"):
             by_category[cat]["passed"] += 1
-    for cat, stats in by_category.items():
+    for _cat, stats in by_category.items():
         stats["pass_rate"] = round(stats["passed"] / stats["total"], 3) if stats["total"] else 0.0
 
     return AggregateMetrics(
@@ -111,8 +127,12 @@ def compute_aggregate(results: list[dict[str, Any]]) -> AggregateMetrics:
         passed=passed_count,
         failed=failed_count,
         pass_rate=round(passed_count / total, 3),
-        avg_groundedness=round(sum(groundedness_vals) / len(groundedness_vals), 3) if groundedness_vals else 0.0,
-        avg_helpfulness=round(sum(helpfulness_vals) / len(helpfulness_vals), 3) if helpfulness_vals else 0.0,
+        avg_groundedness=(
+            round(sum(groundedness_vals) / len(groundedness_vals), 3) if groundedness_vals else 0.0
+        ),
+        avg_helpfulness=(
+            round(sum(helpfulness_vals) / len(helpfulness_vals), 3) if helpfulness_vals else 0.0
+        ),
         avg_policy_score=round(sum(policy_vals) / len(policy_vals), 3) if policy_vals else 0.0,
         intent_accuracy=round(intent_accuracy, 3),
         tool_accuracy=round(tool_accuracy, 3),
@@ -121,7 +141,9 @@ def compute_aggregate(results: list[dict[str, Any]]) -> AggregateMetrics:
     )
 
 
-def check_thresholds(metrics: AggregateMetrics, min_pass_rate: float = 0.85, min_rubric: float = 0.75) -> tuple[bool, list[str]]:
+def check_thresholds(
+    metrics: AggregateMetrics, min_pass_rate: float = 0.85, min_rubric: float = 0.75
+) -> tuple[bool, list[str]]:
     """Return (ok, list_of_violations)."""
     violations: list[str] = []
     if metrics.pass_rate < min_pass_rate:

@@ -40,11 +40,53 @@ _FAQ_GAP_THRESHOLD = 0.50
 _TOOL_GAP_THRESHOLD = 0.30
 
 _STOP = {
-    "the", "and", "for", "are", "our", "you", "your", "can", "will",
-    "with", "that", "this", "from", "not", "but", "all", "has", "have",
-    "is", "in", "of", "to", "a", "an", "or", "it", "at", "by", "be",
-    "as", "we", "on", "if", "any", "also", "available", "may", "hai",
-    "kya", "mera", "meri", "aap", "main", "hun", "tha", "thi", "hain",
+    "the",
+    "and",
+    "for",
+    "are",
+    "our",
+    "you",
+    "your",
+    "can",
+    "will",
+    "with",
+    "that",
+    "this",
+    "from",
+    "not",
+    "but",
+    "all",
+    "has",
+    "have",
+    "is",
+    "in",
+    "of",
+    "to",
+    "a",
+    "an",
+    "or",
+    "it",
+    "at",
+    "by",
+    "be",
+    "as",
+    "we",
+    "on",
+    "if",
+    "any",
+    "also",
+    "available",
+    "may",
+    "hai",
+    "kya",
+    "mera",
+    "meri",
+    "aap",
+    "main",
+    "hun",
+    "tha",
+    "thi",
+    "hain",
 }
 
 
@@ -79,8 +121,8 @@ def _best_score_across_chunks(reference: str, chunks: list[dict]) -> tuple[float
 
 
 async def audit(filter_categories: set[str] | None) -> None:
-    from app.services.rag.retriever import get_retriever
     from app.services.rag.reranker import get_reranker
+    from app.services.rag.retriever import get_retriever
 
     cases: list[dict] = []
     with _GOLDEN_SET.open(encoding="utf-8") as fh:
@@ -100,8 +142,8 @@ async def audit(filter_categories: set[str] | None) -> None:
     reranker = get_reranker()
     await reranker.rerank("warmup", [{"content": "warmup", "id": "w"}])
 
-    gaps_kb: list[dict] = []      # KB-primary cases with bad coverage
-    gaps_tool: list[dict] = []    # Tool cases with no useful KB at all
+    gaps_kb: list[dict] = []  # KB-primary cases with bad coverage
+    gaps_tool: list[dict] = []  # Tool cases with no useful KB at all
     ok_cases: list[dict] = []
 
     print(f"\n{'='*72}")
@@ -109,9 +151,9 @@ async def audit(filter_categories: set[str] | None) -> None:
     print(f"{'='*72}")
 
     for case in cases:
-        case_id    = case["case_id"]
-        category   = case.get("category", "")
-        question   = case["user_message"]
+        case_id = case["case_id"]
+        category = case.get("category", "")
+        question = case["user_message"]
         ground_truth = case.get("ground_truth_answer", "")
         is_kb_primary = category in _KB_PRIMARY
 
@@ -133,8 +175,10 @@ async def audit(filter_categories: set[str] | None) -> None:
             verdict = "OK      ✅"
 
         # Print result
-        print(f"\n[{verdict}] {case_id:10s}  cat={category:20s}  "
-              f"chunks={len(chunks)}  score={best_score:.2f}  best={best_src}")
+        print(
+            f"\n[{verdict}] {case_id:10s}  cat={category:20s}  "
+            f"chunks={len(chunks)}  score={best_score:.2f}  best={best_src}"
+        )
         print(f"  Q : {question[:90]}")
 
         if is_kb_primary:
@@ -143,8 +187,10 @@ async def audit(filter_categories: set[str] | None) -> None:
         # Always show top chunk content for inspection
         if chunks:
             top = chunks[0]
-            print(f"  #1 chunk [{top.get('source_id')}]: "
-                  f"{top.get('content','')[:150].replace(chr(10),' ')}")
+            print(
+                f"  #1 chunk [{top.get('source_id')}]: "
+                f"{top.get('content','')[:150].replace(chr(10),' ')}"
+            )
         else:
             print("  #1 chunk: (none returned)")
 
@@ -173,7 +219,7 @@ async def audit(filter_categories: set[str] | None) -> None:
     # ── Summary ───────────────────────────────────────────────────────────────
     total = len(cases)
     print(f"\n\n{'='*72}")
-    print(f"  SUMMARY")
+    print("  SUMMARY")
     print(f"{'='*72}")
     print(f"  Total cases       : {total}")
     print(f"  OK                : {len(ok_cases)}")
@@ -186,8 +232,10 @@ async def audit(filter_categories: set[str] | None) -> None:
         print("  KB-GAP cases — need new FAQ/article entries:")
         print(f"{'─'*72}")
         for g in gaps_kb:
-            print(f"\n  {g['case_id']:10s}  score={g['best_score']:.2f}  "
-                  f"chunks={g['chunks_returned']}  best={g['best_chunk']}")
+            print(
+                f"\n  {g['case_id']:10s}  score={g['best_score']:.2f}  "
+                f"chunks={g['chunks_returned']}  best={g['best_chunk']}"
+            )
             print(f"  Q : {g['question']}")
             print(f"  GT: {g['ground_truth']}")
 
@@ -196,8 +244,7 @@ async def audit(filter_categories: set[str] | None) -> None:
         print("  NO-KB cases (tool-based, low priority):")
         print(f"{'─'*72}")
         for g in gaps_tool:
-            print(f"  {g['case_id']:10s}  score={g['best_score']:.2f}  "
-                  f"Q: {g['question'][:70]}")
+            print(f"  {g['case_id']:10s}  score={g['best_score']:.2f}  " f"Q: {g['question'][:70]}")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -206,8 +253,7 @@ def _parse_args() -> argparse.Namespace:
         "--category",
         type=str,
         default=None,
-        help="Comma-separated categories to audit (default: all). "
-             "e.g. kb_faq,general_inquiry",
+        help="Comma-separated categories to audit (default: all). " "e.g. kb_faq,general_inquiry",
     )
     return parser.parse_args()
 
@@ -216,8 +262,5 @@ if __name__ == "__main__":
     import app.core.logging  # noqa: F401
 
     args = _parse_args()
-    filter_cats = (
-        {c.strip() for c in args.category.split(",")}
-        if args.category else None
-    )
+    filter_cats = {c.strip() for c in args.category.split(",")} if args.category else None
     asyncio.run(audit(filter_cats))

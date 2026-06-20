@@ -7,14 +7,12 @@ without real credentials or a live database.
 from __future__ import annotations
 
 import json
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.agent.graph import build_graph
-from app.agent.state import AgentState
 from app.services.llm.base import ChatResult
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -91,9 +89,11 @@ async def test_order_status_happy_path():
     ]
 
     call_sequence = [
-        _make_chat_result("order_status"),                          # classify_intent
-        _make_chat_result("", tool_calls=order_tool_call),          # plan_tools
-        _make_chat_result("Your order ORD-123 has been dispatched and will arrive by Friday."),  # compose
+        _make_chat_result("order_status"),  # classify_intent
+        _make_chat_result("", tool_calls=order_tool_call),  # plan_tools
+        _make_chat_result(
+            "Your order ORD-123 has been dispatched and will arrive by Friday."
+        ),  # compose
         _make_chat_result(json.dumps({"score": 0.9, "feedback": "Looks good."})),  # critique
     ]
     call_iter = iter(call_sequence)
@@ -117,7 +117,12 @@ async def test_order_status_happy_path():
         patch("app.agent.nodes.execute_tools.get_tool_registry") as mock_registry_cls,
         patch("app.agent.nodes.plan_tools.get_tool_registry") as mock_registry_plan,
     ):
-        for mock_r in [mock_router_cls, mock_router_plan, mock_router_compose, mock_router_critique]:
+        for mock_r in [
+            mock_router_cls,
+            mock_router_plan,
+            mock_router_compose,
+            mock_router_critique,
+        ]:
             router = MagicMock()
             router.chat = mock_chat
             mock_r.return_value = router
@@ -127,7 +132,12 @@ async def test_order_status_happy_path():
         mock_retriever_cls.return_value = retriever
 
         registry = MagicMock()
-        registry.openai_schemas.return_value = [{"type": "function", "function": {"name": "get_order_status", "description": "", "parameters": {}}}]
+        registry.openai_schemas.return_value = [
+            {
+                "type": "function",
+                "function": {"name": "get_order_status", "description": "", "parameters": {}},
+            }
+        ]
         registry.get.return_value = MagicMock()
         registry.execute = AsyncMock(return_value=mock_order_result)
         mock_registry_cls.return_value = registry
@@ -157,7 +167,9 @@ async def test_refund_request_tool_called():
         {
             "function": {
                 "name": "create_refund_request",
-                "arguments": json.dumps({"order_id": "ORD-456", "reason": "damaged", "amount": 1500}),
+                "arguments": json.dumps(
+                    {"order_id": "ORD-456", "reason": "damaged", "amount": 1500}
+                ),
             }
         }
     ]
@@ -165,7 +177,9 @@ async def test_refund_request_tool_called():
     call_sequence = [
         _make_chat_result("refund_request"),
         _make_chat_result("", tool_calls=refund_tool_call),
-        _make_chat_result("Your refund request has been submitted. You will receive confirmation within 3-5 business days."),
+        _make_chat_result(
+            "Your refund request has been submitted. You will receive confirmation within 3-5 business days."
+        ),
         _make_chat_result(json.dumps({"score": 0.85, "feedback": "Clear and helpful."})),
     ]
     call_iter = iter(call_sequence)
@@ -248,7 +262,10 @@ async def test_explicit_escalation_bypasses_rag():
     assert result["intent"] == "escalate_human"
     assert result["should_escalate"] is True
     assert result["final_response"] is not None
-    assert "specialist" in result["final_response"].lower() or "agent" in result["final_response"].lower()
+    assert (
+        "specialist" in result["final_response"].lower()
+        or "agent" in result["final_response"].lower()
+    )
     # redact_pii, retrieve, plan_tools, compose should NOT appear in audit trail
     node_names = [e["node"] for e in result["audit_trail"]]
     assert "escalate" in node_names
@@ -266,14 +283,14 @@ async def test_critique_retry_then_escalate():
     bad_critique = json.dumps({"score": 0.4, "feedback": "Response is vague."})
 
     call_sequence = [
-        _make_chat_result("general_inquiry"),          # classify
-        _make_chat_result("", tool_calls=[]),           # plan_tools (no tools)
-        _make_chat_result("Here is some info."),        # compose 1
-        _make_chat_result(bad_critique),                # critique 1
-        _make_chat_result("Here is better info."),      # compose 2 (retry 1)
-        _make_chat_result(bad_critique),                # critique 2
-        _make_chat_result("Here is even better info."), # compose 3 (retry 2)
-        _make_chat_result(bad_critique),                # critique 3 → escalate
+        _make_chat_result("general_inquiry"),  # classify
+        _make_chat_result("", tool_calls=[]),  # plan_tools (no tools)
+        _make_chat_result("Here is some info."),  # compose 1
+        _make_chat_result(bad_critique),  # critique 1
+        _make_chat_result("Here is better info."),  # compose 2 (retry 1)
+        _make_chat_result(bad_critique),  # critique 2
+        _make_chat_result("Here is even better info."),  # compose 3 (retry 2)
+        _make_chat_result(bad_critique),  # critique 3 → escalate
     ]
     call_iter = iter(call_sequence)
 
@@ -325,8 +342,10 @@ async def test_general_inquiry_no_tools():
 
     call_sequence = [
         _make_chat_result("general_inquiry"),
-        _make_chat_result("", tool_calls=[]),   # plan_tools → no tools
-        _make_chat_result("Our platform supports payments via JazzCash, EasyPaisa, and bank transfer."),
+        _make_chat_result("", tool_calls=[]),  # plan_tools → no tools
+        _make_chat_result(
+            "Our platform supports payments via JazzCash, EasyPaisa, and bank transfer."
+        ),
         _make_chat_result(json.dumps({"score": 0.88, "feedback": "Looks good."})),
     ]
     call_iter = iter(call_sequence)

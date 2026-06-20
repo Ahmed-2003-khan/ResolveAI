@@ -44,7 +44,7 @@ class Reranker:
             return []
         pairs = [(query, doc.get("content", "")) for doc in docs]
         scores = self._model.predict(pairs)
-        ranked = sorted(zip(scores, docs), key=lambda x: x[0], reverse=True)
+        ranked = sorted(zip(scores, docs, strict=False), key=lambda x: x[0], reverse=True)
         return [doc for _, doc in ranked[:k]]
 
     async def rerank(self, query: str, docs: list[dict], k: int = 5) -> list[dict]:
@@ -53,9 +53,7 @@ class Reranker:
             return []
         try:
             loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                _executor, self._rerank_sync, query, docs, k
-            )
+            return await loop.run_in_executor(_executor, self._rerank_sync, query, docs, k)
         except Exception as exc:
             log.warning("reranker_failed_fallback", error=str(exc))
             return docs[:k]
@@ -64,5 +62,6 @@ class Reranker:
 @lru_cache(maxsize=1)
 def get_reranker() -> Reranker:
     import os
+
     model = os.environ.get("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
     return Reranker(model_name=model)

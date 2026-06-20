@@ -6,12 +6,6 @@ import structlog
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from app.observability.langfuse_client import wrap_node
-from app.observability.metrics import CACHE_HITS, CACHE_MISSES
-from app.services.cache.semantic_cache import get_semantic_cache
-
-log = structlog.get_logger(__name__)
-
 from app.agent.nodes import (
     classify_intent,
     compose_response,
@@ -24,7 +18,11 @@ from app.agent.nodes import (
     send_reply,
 )
 from app.agent.state import AgentState
+from app.observability.langfuse_client import wrap_node
+from app.observability.metrics import CACHE_HITS, CACHE_MISSES
+from app.services.cache.semantic_cache import get_semantic_cache
 
+log = structlog.get_logger(__name__)
 
 # ── Routing functions ────────────────────────────────────────────────────────
 

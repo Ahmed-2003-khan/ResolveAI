@@ -89,12 +89,14 @@ async def test_get_returns_none_on_miss() -> None:
     svc = SemanticCacheService()
     session_mock = _make_session_mock(row=None)
 
-    with _patch_embedder():
-        with patch(
+    with (
+        _patch_embedder(),
+        patch(
             "app.services.cache.semantic_cache.async_session_factory",
             return_value=session_mock,
-        ):
-            result = await svc.get("where is my order?")
+        ),
+    ):
+        result = await svc.get("where is my order?")
 
     assert result is None
 
@@ -115,12 +117,14 @@ async def test_get_returns_cached_response_on_hit() -> None:
     fake_row = {"id": "fake-uuid", "response": _FAKE_RESPONSE, "distance": 0.01}
     session_mock = _make_session_mock(row=fake_row)
 
-    with _patch_embedder():
-        with patch(
+    with (
+        _patch_embedder(),
+        patch(
             "app.services.cache.semantic_cache.async_session_factory",
             return_value=session_mock,
-        ):
-            result = await svc.get("where is my order?")
+        ),
+    ):
+        result = await svc.get("where is my order?")
 
     assert result == _FAKE_RESPONSE
 
@@ -131,12 +135,14 @@ async def test_get_increments_hit_count_on_hit() -> None:
     fake_row = {"id": "fake-uuid", "response": _FAKE_RESPONSE, "distance": 0.005}
     session_mock = _make_session_mock(row=fake_row)
 
-    with _patch_embedder():
-        with patch(
+    with (
+        _patch_embedder(),
+        patch(
             "app.services.cache.semantic_cache.async_session_factory",
             return_value=session_mock,
-        ):
-            await svc.get("order status please")
+        ),
+    ):
+        await svc.get("order status please")
 
     # Should have called execute twice: SELECT and UPDATE
     assert session_mock.execute.call_count == 2
@@ -169,12 +175,14 @@ async def test_get_returns_none_when_db_fails() -> None:
     session_mock.__aenter__ = AsyncMock(side_effect=OSError("DB unreachable"))
     session_mock.__aexit__ = AsyncMock(return_value=False)
 
-    with _patch_embedder():
-        with patch(
+    with (
+        _patch_embedder(),
+        patch(
             "app.services.cache.semantic_cache.async_session_factory",
             return_value=session_mock,
-        ):
-            result = await svc.get("any query")
+        ),
+    ):
+        result = await svc.get("any query")
 
     assert result is None
 
@@ -187,12 +195,14 @@ async def test_set_executes_insert() -> None:
     svc = SemanticCacheService()
     session_mock = _make_session_mock()
 
-    with _patch_embedder():
-        with patch(
+    with (
+        _patch_embedder(),
+        patch(
             "app.services.cache.semantic_cache.async_session_factory",
             return_value=session_mock,
-        ):
-            await svc.set("where is my order?", _FAKE_RESPONSE)
+        ),
+    ):
+        await svc.set("where is my order?", _FAKE_RESPONSE)
 
     session_mock.execute.assert_awaited_once()
     session_mock.commit.assert_awaited_once()
@@ -202,23 +212,23 @@ async def test_set_executes_insert() -> None:
 async def test_set_is_noop_for_empty_query() -> None:
     svc = SemanticCacheService()
     # Should return without touching the DB
-    with _patch_embedder():
-        with patch(
-            "app.services.cache.semantic_cache.async_session_factory"
-        ) as mock_factory:
-            await svc.set("   ", _FAKE_RESPONSE)
-            mock_factory.assert_not_called()
+    with (
+        _patch_embedder(),
+        patch("app.services.cache.semantic_cache.async_session_factory") as mock_factory,
+    ):
+        await svc.set("   ", _FAKE_RESPONSE)
+        mock_factory.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_set_is_noop_for_empty_response() -> None:
     svc = SemanticCacheService()
-    with _patch_embedder():
-        with patch(
-            "app.services.cache.semantic_cache.async_session_factory"
-        ) as mock_factory:
-            await svc.set("hello", "")
-            mock_factory.assert_not_called()
+    with (
+        _patch_embedder(),
+        patch("app.services.cache.semantic_cache.async_session_factory") as mock_factory,
+    ):
+        await svc.set("hello", "")
+        mock_factory.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -228,13 +238,15 @@ async def test_set_survives_db_error() -> None:
     session_mock.__aenter__ = AsyncMock(side_effect=OSError("DB unreachable"))
     session_mock.__aexit__ = AsyncMock(return_value=False)
 
-    with _patch_embedder():
-        with patch(
+    with (
+        _patch_embedder(),
+        patch(
             "app.services.cache.semantic_cache.async_session_factory",
             return_value=session_mock,
-        ):
-            # Must not raise
-            await svc.set("hello", _FAKE_RESPONSE)
+        ),
+    ):
+        # Must not raise
+        await svc.set("hello", _FAKE_RESPONSE)
 
 
 @pytest.mark.asyncio
@@ -243,13 +255,15 @@ async def test_set_survives_embed_error() -> None:
     mock_embedder = AsyncMock()
     mock_embedder.embed_one = AsyncMock(side_effect=RuntimeError("API down"))
 
-    with patch(
-        "app.services.cache.semantic_cache.get_embedder",
-        return_value=mock_embedder,
+    with (
+        patch(
+            "app.services.cache.semantic_cache.get_embedder",
+            return_value=mock_embedder,
+        ),
+        patch("app.services.cache.semantic_cache.async_session_factory") as mock_factory,
     ):
-        with patch("app.services.cache.semantic_cache.async_session_factory") as mock_factory:
-            await svc.set("hello", _FAKE_RESPONSE)
-            mock_factory.assert_not_called()
+        await svc.set("hello", _FAKE_RESPONSE)
+        mock_factory.assert_not_called()
 
 
 # ── Singleton ─────────────────────────────────────────────────────────────────
@@ -273,16 +287,18 @@ async def test_run_with_cache_returns_cached_on_hit() -> None:
     mock_cache.get = AsyncMock(return_value=_FAKE_RESPONSE)
 
     # Patch the module-level name in graph.py
-    with patch("app.agent.graph.get_semantic_cache", return_value=mock_cache):
-        with patch("app.agent.graph.CACHE_HITS") as mock_hits:
-            with patch("app.agent.graph.CACHE_MISSES"):
-                result = await run_with_cache(
-                    {
-                        "conversation_id": "conv-test",
-                        "user_message": "where is my order?",
-                    }
-                )
-            mock_hits.inc.assert_called_once()
+    with (
+        patch("app.agent.graph.get_semantic_cache", return_value=mock_cache),
+        patch("app.agent.graph.CACHE_HITS") as mock_hits,
+        patch("app.agent.graph.CACHE_MISSES"),
+    ):
+        result = await run_with_cache(
+            {
+                "conversation_id": "conv-test",
+                "user_message": "where is my order?",
+            }
+        )
+        mock_hits.inc.assert_called_once()
 
     assert result["final_response"] == _FAKE_RESPONSE
     audit = result["audit_trail"]
@@ -308,14 +324,14 @@ async def test_run_with_cache_invokes_graph_on_miss() -> None:
     mock_graph = AsyncMock()
     mock_graph.ainvoke = AsyncMock(return_value=graph_result)
 
-    with patch("app.agent.graph.get_semantic_cache", return_value=mock_cache):
-        with patch("app.agent.graph.get_graph", return_value=mock_graph):
-            with patch("app.agent.graph.CACHE_MISSES") as mock_misses:
-                with patch("app.agent.graph.CACHE_HITS"):
-                    result = await run_with_cache(
-                        {"conversation_id": "conv-test", "user_message": "hello"}
-                    )
-                mock_misses.inc.assert_called_once()
+    with (
+        patch("app.agent.graph.get_semantic_cache", return_value=mock_cache),
+        patch("app.agent.graph.get_graph", return_value=mock_graph),
+        patch("app.agent.graph.CACHE_MISSES") as mock_misses,
+        patch("app.agent.graph.CACHE_HITS"),
+    ):
+        result = await run_with_cache({"conversation_id": "conv-test", "user_message": "hello"})
+        mock_misses.inc.assert_called_once()
 
     assert result["final_response"] == "Hello! How can I help?"
     mock_cache.set.assert_awaited_once_with("hello", "Hello! How can I help?")
@@ -347,16 +363,18 @@ async def test_run_with_cache_does_not_store_personalized_response() -> None:
     mock_graph = AsyncMock()
     mock_graph.ainvoke = AsyncMock(return_value=graph_result)
 
-    with patch("app.agent.graph.get_semantic_cache", return_value=mock_cache):
-        with patch("app.agent.graph.get_graph", return_value=mock_graph):
-            with patch("app.agent.graph.CACHE_MISSES"):
-                with patch("app.agent.graph.CACHE_HITS"):
-                    await run_with_cache(
-                        {
-                            "conversation_id": "conv-test",
-                            "user_message": "mera order ORD-001 kahan hai?",
-                        }
-                    )
+    with (
+        patch("app.agent.graph.get_semantic_cache", return_value=mock_cache),
+        patch("app.agent.graph.get_graph", return_value=mock_graph),
+        patch("app.agent.graph.CACHE_MISSES"),
+        patch("app.agent.graph.CACHE_HITS"),
+    ):
+        await run_with_cache(
+            {
+                "conversation_id": "conv-test",
+                "user_message": "mera order ORD-001 kahan hai?",
+            }
+        )
 
     # cache.set must NOT have been called — personal data cannot be shared
     mock_cache.set.assert_not_awaited()

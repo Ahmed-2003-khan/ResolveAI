@@ -55,7 +55,9 @@ class OllamaProvider(LLMProvider):
         content = data.get("message", {}).get("content", "")
         in_tok = data.get("prompt_eval_count", 0)
         out_tok = data.get("eval_count", 0)
-        log.debug("ollama_chat_ok", model=model, in_tok=in_tok, out_tok=out_tok, latency_ms=latency_ms)
+        log.debug(
+            "ollama_chat_ok", model=model, in_tok=in_tok, out_tok=out_tok, latency_ms=latency_ms
+        )
         return ChatResult(
             content=content,
             model=model,

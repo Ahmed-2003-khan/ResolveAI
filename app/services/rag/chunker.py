@@ -91,7 +91,4 @@ def chunk_document(
         return [ChunkResult(content=text, chunk_index=0, total_chunks=1)]
 
     raw = chunk_article(content)
-    return [
-        ChunkResult(content=c, chunk_index=i, total_chunks=len(raw))
-        for i, c in enumerate(raw)
-    ]
+    return [ChunkResult(content=c, chunk_index=i, total_chunks=len(raw)) for i, c in enumerate(raw)]
