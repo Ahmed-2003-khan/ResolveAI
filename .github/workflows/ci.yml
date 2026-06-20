@@ -62,7 +62,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://resolveai:resolveai@localhost:5432/resolveai
       REDIS_URL: redis://localhost:6379/0
-      APP_ENV: testing
+      APP_ENV: development
       APP_SECRET_KEY: ci-secret-not-for-prod
       LOG_LEVEL: WARNING
       # LLM keys — integration tests mock all LLM/embedding calls
@@ -152,7 +152,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://resolveai:resolveai@localhost:5432/resolveai
       REDIS_URL: redis://localhost:6379/0
-      APP_ENV: testing
+      APP_ENV: development
       APP_SECRET_KEY: ci-secret-not-for-prod
       LOG_LEVEL: WARNING
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
